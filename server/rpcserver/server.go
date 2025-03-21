@@ -3,11 +3,6 @@ package rpcserver
 import (
 	"context"
 	"fmt"
-	"goken/pkg/common/hostgen"
-	errors "goken/pkg/errors"
-	"goken/pkg/log"
-	"goken/registry"
-	sinterceptors "goken/server/rpcserver/sinterceptors"
 	"net"
 	"net/url"
 	"os"
@@ -15,6 +10,13 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/Hkensame/goken/registry"
+
+	"github.com/Hkensame/goken/pkg/common/hostgen"
+	errors "github.com/Hkensame/goken/pkg/errors"
+	"github.com/Hkensame/goken/pkg/log"
+	sinterceptors "github.com/Hkensame/goken/server/rpcserver/sinterceptors"
 
 	"github.com/oklog/run"
 	"google.golang.org/grpc"
@@ -162,12 +164,10 @@ func (s *Server) Serve() error {
 
 	g.Add(
 		func() error {
-
 			<-sign
 			s.Server.GracefulStop()
 			deregisterFunc()
 			return nil
-
 		},
 		func(err error) {
 			sign <- syscall.SIGINT

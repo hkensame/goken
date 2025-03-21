@@ -5,8 +5,9 @@ import (
 	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/sha512"
-	"goken/pkg/errors"
 	"hash"
+
+	"github.com/Hkensame/goken/pkg/errors"
 
 	"golang.org/x/crypto/sha3"
 

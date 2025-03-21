@@ -13,18 +13,19 @@ import (
 	"sync"
 	"syscall"
 
-	"goken/registry"
-	mws "goken/server/httpserver/middlewares"
-	"goken/server/httpserver/middlewares/jwt"
-	otelkgin "goken/server/httpserver/middlewares/otel"
-	"goken/server/httpserver/validate"
-	"goken/server/rpcserver"
+	"github.com/Hkensame/goken/registry"
+	"github.com/Hkensame/goken/server/httpserver/middlewares/jwt"
+	otelkgin "github.com/Hkensame/goken/server/httpserver/middlewares/otel"
+
+	mws "github.com/Hkensame/goken/server/httpserver/middlewares"
+	"github.com/Hkensame/goken/server/httpserver/validate"
+	"github.com/Hkensame/goken/server/rpcserver"
 
 	//"goken/server/httpserver/pprof"
 
-	"goken/pkg/common/hostgen"
-	errors "goken/pkg/errors"
-	"goken/pkg/log"
+	"github.com/Hkensame/goken/pkg/common/hostgen"
+	errors "github.com/Hkensame/goken/pkg/errors"
+	"github.com/Hkensame/goken/pkg/log"
 
 	"github.com/gin-gonic/gin"
 	"github.com/oklog/run"

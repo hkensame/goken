@@ -2,8 +2,9 @@ package registry
 
 import (
 	"context"
-	"goken/pkg/errors"
 	"net/url"
+
+	"github.com/Hkensame/goken/pkg/errors"
 )
 
 //任意注册中心想嵌入到代码中只需实现以下接口

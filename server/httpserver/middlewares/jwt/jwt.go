@@ -2,9 +2,10 @@ package jwt
 
 import (
 	"encoding/json"
-	"goken/pkg/common/httputil"
 	"net/http"
 	"time"
+
+	"github.com/Hkensame/goken/pkg/common/httputil"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"

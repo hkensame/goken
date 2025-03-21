@@ -3,10 +3,11 @@ package rpcserver
 import (
 	"context"
 	"fmt"
-	"goken/registry"
 	"net/url"
 
-	discover "goken/registry/discover"
+	"github.com/Hkensame/goken/registry"
+
+	discover "github.com/Hkensame/goken/registry/discover"
 
 	"google.golang.org/grpc"
 	grpcinsecure "google.golang.org/grpc/credentials/insecure"

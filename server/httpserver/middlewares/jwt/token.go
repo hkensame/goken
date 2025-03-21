@@ -1,10 +1,11 @@
 package jwt
 
 import (
-	"goken/pkg/cache"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/Hkensame/goken/pkg/cache"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"

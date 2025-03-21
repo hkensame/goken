@@ -7,7 +7,7 @@ import (
 
 	"io"
 
-	ktrace "goken/pkg/trace"
+	ktrace "github.com/Hkensame/goken/pkg/trace"
 
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"

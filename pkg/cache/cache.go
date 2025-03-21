@@ -3,9 +3,10 @@ package cache
 import (
 	"context"
 	"errors"
-	"goken/pkg/log"
-	"goken/pkg/redlock"
 	"time"
+
+	"github.com/Hkensame/goken/pkg/log"
+	"github.com/Hkensame/goken/pkg/redlock"
 
 	"github.com/allegro/bigcache"
 	"github.com/apache/rocketmq-client-go/v2"

@@ -2,11 +2,12 @@ package consul
 
 import (
 	"context"
-	"goken/registry"
 	"net"
 	"net/url"
 	"strconv"
 	"strings"
+
+	"github.com/Hkensame/goken/registry"
 
 	"github.com/hashicorp/consul/api"
 )

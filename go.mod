@@ -1,4 +1,4 @@
-module goken
+module github.com/Hkensame/goken
 
 go 1.23.0
 

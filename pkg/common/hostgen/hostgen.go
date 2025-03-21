@@ -1,10 +1,11 @@
 package hostgen
 
 import (
-	"goken/pkg/errors"
-	"goken/pkg/log"
 	"net"
 	"strconv"
+
+	"github.com/Hkensame/goken/pkg/errors"
+	"github.com/Hkensame/goken/pkg/log"
 )
 
 var ErrInvalidHost = errors.New("错误的host格式")

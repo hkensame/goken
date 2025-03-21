@@ -2,8 +2,9 @@ package cache
 
 import (
 	"context"
-	"goken/pkg/redlock"
 	"time"
+
+	"github.com/Hkensame/goken/pkg/redlock"
 
 	"github.com/allegro/bigcache"
 	"github.com/redis/go-redis/v9"

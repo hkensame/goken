@@ -3,11 +3,12 @@ package sinterceptors
 import (
 	"context"
 	"fmt"
-	errors "goken/pkg/errors"
 	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
+
+	errors "github.com/Hkensame/goken/pkg/errors"
 
 	"google.golang.org/grpc"
 )

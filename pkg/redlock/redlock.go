@@ -3,9 +3,10 @@ package redlock
 import (
 	"context"
 	"fmt"
-	"goken/pkg/errors"
-	"goken/pkg/log"
 	"time"
+
+	"github.com/Hkensame/goken/pkg/errors"
+	"github.com/Hkensame/goken/pkg/log"
 
 	"github.com/go-redsync/redsync/v4"
 	redpool "github.com/go-redsync/redsync/v4/redis"

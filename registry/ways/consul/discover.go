@@ -3,11 +3,12 @@ package consul
 import (
 	"context"
 	"fmt"
-	"goken/pkg/log"
-	"goken/pkg/queue"
-	"goken/registry"
 	"sync"
 	"time"
+
+	"github.com/Hkensame/goken/pkg/log"
+	"github.com/Hkensame/goken/pkg/queue"
+	"github.com/Hkensame/goken/registry"
 
 	"github.com/hashicorp/consul/api"
 )

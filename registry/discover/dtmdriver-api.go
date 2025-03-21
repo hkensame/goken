@@ -3,10 +3,11 @@ package discover
 import (
 	"context"
 	"fmt"
-	"goken/pkg/errors"
-	"goken/registry"
 	"net/url"
 	"strings"
+
+	"github.com/Hkensame/goken/pkg/errors"
+	"github.com/Hkensame/goken/registry"
 
 	"google.golang.org/grpc/resolver"
 )

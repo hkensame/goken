@@ -1,8 +1,9 @@
 package jwt
 
 import (
-	"goken/pkg/common/httputil"
 	"net/http"
+
+	"github.com/Hkensame/goken/pkg/common/httputil"
 
 	"github.com/gin-gonic/gin"
 )
