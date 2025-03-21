@@ -3,7 +3,7 @@ package registor
 import (
 	"context"
 
-	"github.com/Hkensame/goken/registry"
+	"github.com/hkensame/goken/registry"
 )
 
 // 最后权衡:goken内部的注册器名为Register

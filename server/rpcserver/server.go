@@ -11,12 +11,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Hkensame/goken/registry"
+	"github.com/hkensame/goken/registry"
 
-	"github.com/Hkensame/goken/pkg/common/hostgen"
-	errors "github.com/Hkensame/goken/pkg/errors"
-	"github.com/Hkensame/goken/pkg/log"
-	sinterceptors "github.com/Hkensame/goken/server/rpcserver/sinterceptors"
+	"github.com/hkensame/goken/pkg/common/hostgen"
+	errors "github.com/hkensame/goken/pkg/errors"
+	"github.com/hkensame/goken/pkg/log"
+	sinterceptors "github.com/hkensame/goken/server/rpcserver/sinterceptors"
 
 	"github.com/oklog/run"
 	"google.golang.org/grpc"

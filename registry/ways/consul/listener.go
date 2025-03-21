@@ -3,7 +3,7 @@ package consul
 import (
 	"context"
 
-	"github.com/Hkensame/goken/registry"
+	"github.com/hkensame/goken/registry"
 )
 
 // listener扮演消费者的形象,讲consul中服务的变化信息当做可消费信息,并将信息push到各个客户端中

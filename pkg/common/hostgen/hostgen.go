@@ -4,8 +4,8 @@ import (
 	"net"
 	"strconv"
 
-	"github.com/Hkensame/goken/pkg/errors"
-	"github.com/Hkensame/goken/pkg/log"
+	"github.com/hkensame/goken/pkg/errors"
+	"github.com/hkensame/goken/pkg/log"
 )
 
 var ErrInvalidHost = errors.New("错误的host格式")

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	ktrace "github.com/Hkensame/goken/pkg/trace"
+	ktrace "github.com/hkensame/goken/pkg/trace"
 
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel"

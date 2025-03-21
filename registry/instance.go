@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/url"
 
-	"github.com/Hkensame/goken/pkg/errors"
+	"github.com/hkensame/goken/pkg/errors"
 )
 
 //任意注册中心想嵌入到代码中只需实现以下接口

@@ -5,8 +5,8 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/Hkensame/goken/pkg/common/hostgen"
-	"github.com/Hkensame/goken/pkg/log"
+	"github.com/hkensame/goken/pkg/common/hostgen"
+	"github.com/hkensame/goken/pkg/log"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"

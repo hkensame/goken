@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	errors "github.com/Hkensame/goken/pkg/errors"
+	errors "github.com/hkensame/goken/pkg/errors"
 
 	"google.golang.org/grpc"
 )

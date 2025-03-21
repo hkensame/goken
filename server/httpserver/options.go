@@ -3,10 +3,10 @@ package httpserver
 import (
 	"net/http"
 
-	"github.com/Hkensame/goken/registry"
-	"github.com/Hkensame/goken/server/httpserver/middlewares/jwt"
-	otelkgin "github.com/Hkensame/goken/server/httpserver/middlewares/otel"
-	"github.com/Hkensame/goken/server/rpcserver"
+	"github.com/hkensame/goken/registry"
+	"github.com/hkensame/goken/server/httpserver/middlewares/jwt"
+	otelkgin "github.com/hkensame/goken/server/httpserver/middlewares/otel"
+	"github.com/hkensame/goken/server/rpcserver"
 
 	"github.com/gin-gonic/gin"
 )

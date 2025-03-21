@@ -5,8 +5,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/Hkensame/goken/pkg/log"
-	"github.com/Hkensame/goken/registry"
+	"github.com/hkensame/goken/pkg/log"
+	"github.com/hkensame/goken/registry"
 
 	"google.golang.org/grpc/attributes"
 	"google.golang.org/grpc/resolver"

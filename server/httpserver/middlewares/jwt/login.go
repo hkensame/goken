@@ -3,7 +3,7 @@ package jwt
 import (
 	"net/http"
 
-	"github.com/Hkensame/goken/pkg/common/httputil"
+	"github.com/hkensame/goken/pkg/common/httputil"
 
 	"github.com/gin-gonic/gin"
 )

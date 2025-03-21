@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/Hkensame/goken/pkg/redlock"
+	"github.com/hkensame/goken/pkg/redlock"
 
 	"github.com/allegro/bigcache"
 	"github.com/redis/go-redis/v9"

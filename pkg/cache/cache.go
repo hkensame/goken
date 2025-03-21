@@ -5,8 +5,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/Hkensame/goken/pkg/log"
-	"github.com/Hkensame/goken/pkg/redlock"
+	"github.com/hkensame/goken/pkg/log"
+	"github.com/hkensame/goken/pkg/redlock"
 
 	"github.com/allegro/bigcache"
 	"github.com/apache/rocketmq-client-go/v2"

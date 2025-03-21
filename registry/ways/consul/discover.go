@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Hkensame/goken/pkg/log"
-	"github.com/Hkensame/goken/pkg/queue"
-	"github.com/Hkensame/goken/registry"
+	"github.com/hkensame/goken/pkg/log"
+	"github.com/hkensame/goken/pkg/queue"
+	"github.com/hkensame/goken/registry"
 
 	"github.com/hashicorp/consul/api"
 )

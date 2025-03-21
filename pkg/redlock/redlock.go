@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Hkensame/goken/pkg/errors"
-	"github.com/Hkensame/goken/pkg/log"
+	"github.com/hkensame/goken/pkg/errors"
+	"github.com/hkensame/goken/pkg/log"
 
 	"github.com/go-redsync/redsync/v4"
 	redpool "github.com/go-redsync/redsync/v4/redis"

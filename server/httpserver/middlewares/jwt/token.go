@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Hkensame/goken/pkg/cache"
+	"github.com/hkensame/goken/pkg/cache"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"

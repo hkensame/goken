@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/Hkensame/goken/registry"
+	"github.com/hkensame/goken/registry"
 
-	discover "github.com/Hkensame/goken/registry/discover"
+	discover "github.com/hkensame/goken/registry/discover"
 
 	"google.golang.org/grpc"
 	grpcinsecure "google.golang.org/grpc/credentials/insecure"

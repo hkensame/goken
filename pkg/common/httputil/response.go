@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/Hkensame/goken/pkg/errors"
+	"github.com/hkensame/goken/pkg/errors"
 
 	"github.com/gin-gonic/gin"
 	ut "github.com/go-playground/universal-translator"
