@@ -3,8 +3,8 @@ package cache
 import (
 	"context"
 	"errors"
-	"kenshop/pkg/log"
-	"kenshop/pkg/redlock"
+	"goken/pkg/log"
+	"goken/pkg/redlock"
 	"time"
 
 	"github.com/allegro/bigcache"

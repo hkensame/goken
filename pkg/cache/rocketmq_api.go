@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"kenshop/pkg/log"
+	"goken/pkg/log"
 	"runtime"
 
 	"github.com/apache/rocketmq-client-go/v2"

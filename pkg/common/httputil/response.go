@@ -1,7 +1,7 @@
 package httputil
 
 import (
-	"kenshop/pkg/errors"
+	"goken/pkg/errors"
 	"net/http"
 	"strings"
 

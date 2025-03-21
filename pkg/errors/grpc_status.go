@@ -162,11 +162,14 @@ func MarshalCodeError(err error) string {
 // 从gRPC错误提取withCode结构
 func ExtractCodeErrorFromGRPC(err error) error {
 	if st, ok := status.FromError(err); ok {
-		var c withCode
-		if jsonErr := json.Unmarshal([]byte(st.Message()), &c); jsonErr != nil {
-			return err
+		var c *withCode
+		switch marshalerCtn {
+		case UseGobMarshaler:
+			c.unmarshalGOB([]byte(st.Message()))
+		case UseJsonMarshaler:
+			c.unmarshalJSON([]byte(st.Message()))
 		}
-		return &c
+		return c
 	}
 	return err
 }

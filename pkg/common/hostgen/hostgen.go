@@ -1,8 +1,8 @@
 package hostgen
 
 import (
-	"kenshop/pkg/errors"
-	"kenshop/pkg/log"
+	"goken/pkg/errors"
+	"goken/pkg/log"
 	"net"
 	"strconv"
 )

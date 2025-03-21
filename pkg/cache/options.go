@@ -2,7 +2,7 @@ package cache
 
 import (
 	"context"
-	"kenshop/pkg/redlock"
+	"goken/pkg/redlock"
 	"time"
 
 	"github.com/allegro/bigcache"

@@ -5,8 +5,8 @@ import (
 	"errors"
 	"net/http"
 
-	"kenshop/pkg/common/hostgen"
-	"kenshop/pkg/log"
+	"goken/pkg/common/hostgen"
+	"goken/pkg/log"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"

@@ -17,8 +17,6 @@ const (
 	defaultKeyLen     = 32
 )
 
-var defaultHashFunction = sha512.New()
-
 // 用于自定义盐值长度,迭代次数,编码密钥长度以及所使用的哈希函数,
 // 如果设置为 nil,则使用默认选项:EncryptOption{ 256, 10000, 512, "sha512" }
 type EncryptOption struct {

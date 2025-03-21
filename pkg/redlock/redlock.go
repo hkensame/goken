@@ -3,8 +3,8 @@ package redlock
 import (
 	"context"
 	"fmt"
-	"kenshop/pkg/errors"
-	"kenshop/pkg/log"
+	"goken/pkg/errors"
+	"goken/pkg/log"
 	"time"
 
 	"github.com/go-redsync/redsync/v4"
