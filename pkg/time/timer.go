@@ -23,9 +23,11 @@ func MustNewResettableTimer(period time.Duration, fn func()) *ResettableTimer {
 		running: true,
 	}
 	rt.timer = time.NewTimer(period)
-
-	go rt.runLoop()
 	return rt
+}
+
+func (rf *ResettableTimer) Run() {
+	go rf.runLoop()
 }
 
 // 运行定时器的主循环
