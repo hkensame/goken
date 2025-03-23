@@ -10,17 +10,20 @@ type ResettableTimer struct {
 	mu      sync.Mutex
 	timer   *time.Timer
 	period  time.Duration
-	running bool
+	closed  bool
 	fn      func()
+	doFirst bool
 }
+
+type OptionFunc func(*ResettableTimer)
 
 // 创建新的可重置定时器,该定时器在不调用reset的情况下每隔一次指定period时间段都将运行一次fn,不会停止
 // 如果调用了reset则重新进入等待而不是类似官方timer那样触发fn
-func MustNewResettableTimer(period time.Duration, fn func()) *ResettableTimer {
+func MustNewResettableTimer(period time.Duration, fn func(), opts ...OptionFunc) *ResettableTimer {
 	rt := &ResettableTimer{
-		period:  period,
-		fn:      fn,
-		running: true,
+		period: period,
+		fn:     fn,
+		closed: false,
 	}
 	rt.timer = time.NewTimer(period)
 	return rt
@@ -32,10 +35,16 @@ func (rf *ResettableTimer) Run() {
 
 // 运行定时器的主循环
 func (rt *ResettableTimer) runLoop() {
-	for rt.running {
+	rt.mu.Lock()
+	if !rt.closed && rt.doFirst {
+		rt.fn()
+	}
+	rt.mu.Unlock()
+
+	for rt.closed {
 		<-rt.timer.C
 		rt.mu.Lock()
-		if !rt.running {
+		if !rt.closed {
 			rt.mu.Unlock()
 			return
 		}
@@ -48,9 +57,14 @@ func (rt *ResettableTimer) runLoop() {
 // 重新开始定时器
 func (rt *ResettableTimer) Reset() {
 	rt.mu.Lock()
+	rt.ResetWithTTK(rt.period)
+}
+
+func (rt *ResettableTimer) ResetWithTTK(t time.Duration) {
+	rt.mu.Lock()
 	defer rt.mu.Unlock()
 
-	if !rt.running {
+	if !rt.closed {
 		return
 	}
 
@@ -60,13 +74,20 @@ func (rt *ResettableTimer) Reset() {
 		default:
 		}
 	}
-	rt.timer.Reset(rt.period)
+	rt.timer.Reset(t)
 }
 
 // 停止定时器
 func (rt *ResettableTimer) Stop() {
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
-	rt.running = false
+	rt.closed = true
 	rt.timer.Stop()
+}
+
+// 让整个定时器先执行一次传入的func再进行定时
+func (rt *ResettableTimer) WithDoFirst(do bool) OptionFunc {
+	return func(rt *ResettableTimer) {
+		rt.doFirst = do
+	}
 }
