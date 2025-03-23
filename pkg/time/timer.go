@@ -11,7 +11,7 @@ type ResettableTimer struct {
 	timer   *time.Timer
 	period  time.Duration
 	closed  bool
-	fn      func()
+	fn      func() bool
 	doFirst bool
 }
 
@@ -19,7 +19,7 @@ type OptionFunc func(*ResettableTimer)
 
 // 创建新的可重置定时器,该定时器在不调用reset的情况下每隔一次指定period时间段都将运行一次fn,不会停止
 // 如果调用了reset则重新进入等待而不是类似官方timer那样触发fn
-func MustNewResettableTimer(period time.Duration, fn func(), opts ...OptionFunc) *ResettableTimer {
+func MustNewResettableTimer(period time.Duration, fn func() bool, opts ...OptionFunc) *ResettableTimer {
 	rt := &ResettableTimer{
 		period: period,
 		fn:     fn,
@@ -37,7 +37,9 @@ func (rf *ResettableTimer) Run() {
 func (rt *ResettableTimer) runLoop() {
 	rt.mu.Lock()
 	if !rt.closed && rt.doFirst {
-		rt.fn()
+		if !rt.fn() {
+			rt.closed = true
+		}
 	}
 	rt.mu.Unlock()
 
