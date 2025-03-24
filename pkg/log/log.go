@@ -13,7 +13,7 @@ var gLogger *otelzap.Logger
 var gSLogger *otelzap.SugaredLogger
 
 func init() {
-	gLogger = MustNewOtelLogger()
+	gLogger = MustNewOtelLogger(WithZapOptions(zap.AddCallerSkip(1)))
 	gSLogger = gLogger.Sugar()
 }
 
