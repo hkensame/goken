@@ -1,6 +1,7 @@
-package time
+package ktime
 
 import (
+	"fmt"
 	"sync"
 	"time"
 )
@@ -27,6 +28,7 @@ func MustNewResettableTimer(period time.Duration, fn func() bool, opts ...Option
 	rt := &ResettableTimer{
 		period:  period,
 		fn:      fn,
+		closed:  true,
 		resetCh: make(chan struct{}),
 	}
 
@@ -34,7 +36,6 @@ func MustNewResettableTimer(period time.Duration, fn func() bool, opts ...Option
 		opt(rt)
 	}
 
-	rt.timer = time.NewTimer(period)
 	rt.tfn = func() time.Duration {
 		return period
 	}
@@ -46,6 +47,8 @@ func (rf *ResettableTimer) Run() {
 	defer rf.mu.Unlock()
 	//允许stop后重启,如果发现timer是关闭的则重新启动
 	if rf.closed {
+		fmt.Println("启动一次")
+		rf.timer = time.NewTimer(rf.tfn())
 		rf.resetCh = make(chan struct{})
 		rf.closed = false
 		go rf.runLoop()
@@ -126,14 +129,14 @@ func (rt *ResettableTimer) Stop() {
 }
 
 // 让整个定时器先执行一次传入的func再进行定时,注意如果关闭了定时器再开启会再次判断一次doFirst
-func (rt *ResettableTimer) WithDoFirst(do bool) OptionFunc {
+func WithDoFirst(do bool) OptionFunc {
 	return func(rt *ResettableTimer) {
 		rt.doFirst = do
 	}
 }
 
 // 允许让fn生成在时间区间内随机的等待时间
-func (rt *ResettableTimer) WithRandomTimer(fn func() time.Duration) OptionFunc {
+func WithRandomTimer(fn func() time.Duration) OptionFunc {
 	return func(rt *ResettableTimer) {
 		rt.tfn = fn
 	}
