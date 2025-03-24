@@ -1,7 +1,6 @@
 package ktime
 
 import (
-	"fmt"
 	"sync"
 	"time"
 )
@@ -47,7 +46,6 @@ func (rf *ResettableTimer) Run() {
 	defer rf.mu.Unlock()
 	//允许stop后重启,如果发现timer是关闭的则重新启动
 	if rf.closed {
-		fmt.Println("启动一次")
 		rf.timer = time.NewTimer(rf.tfn())
 		rf.resetCh = make(chan struct{})
 		rf.closed = false
