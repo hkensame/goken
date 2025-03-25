@@ -31,37 +31,39 @@ func MustNewResettableTimer(period time.Duration, fn func() bool, opts ...Option
 		resetCh: make(chan struct{}),
 	}
 
+	rt.tfn = func() time.Duration {
+		return period
+	}
+
 	for _, opt := range opts {
 		opt(rt)
 	}
 
-	rt.tfn = func() time.Duration {
-		return period
-	}
 	return rt
 }
 
-func (rf *ResettableTimer) Run() {
-	rf.mu.Lock()
-	defer rf.mu.Unlock()
+func (rt *ResettableTimer) Run() {
+	rt.mu.Lock()
+	defer rt.mu.Unlock()
 	//允许stop后重启,如果发现timer是关闭的则重新启动
-	if rf.closed {
-		rf.timer = time.NewTimer(rf.tfn())
-		rf.resetCh = make(chan struct{})
-		rf.closed = false
-		go rf.runLoop()
+	if rt.closed {
+		rt.resetCh = make(chan struct{})
+		rt.closed = false
+		go rt.runLoop()
 	}
 }
 
 // 运行定时器的主循环
 func (rt *ResettableTimer) runLoop() {
 	rt.mu.Lock()
-	if !rt.closed && rt.doFirst {
-		if !rt.fn() {
-			rt.closed = true
-		}
+	if !rt.closed && rt.doFirst && !rt.fn() {
+		rt.closed = true
+		rt.mu.Unlock()
+		return
 	}
+
 	rt.mu.Unlock()
+	rt.timer = time.NewTimer(rt.tfn())
 
 	for !rt.closed {
 		select {
@@ -78,9 +80,16 @@ func (rt *ResettableTimer) runLoop() {
 			} else {
 				//如果运行fn成功则重新开始定时运行任务
 				rt.timer.Stop()
+				// 清除可能残留的事件
+				select {
+				case <-rt.timer.C:
+				default:
+				}
 				rt.timer = time.NewTimer(rt.tfn())
+
 			}
 			rt.mu.Unlock()
+
 		case <-rt.resetCh:
 			//如果reset函数触发则重置timer,老的timer直接忽视
 			rt.mu.Lock()
@@ -90,6 +99,11 @@ func (rt *ResettableTimer) runLoop() {
 			}
 
 			rt.timer.Stop()
+			select {
+			case <-rt.timer.C:
+			default:
+			}
+
 			rt.timer = time.NewTimer(rt.tfn())
 			rt.mu.Unlock()
 		}
@@ -105,11 +119,9 @@ func (rt *ResettableTimer) Reset() {
 func (rt *ResettableTimer) ResetWithTTK(t time.Duration) {
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
-
 	if rt.closed {
 		return
 	}
-
 	select {
 	case rt.resetCh <- struct{}{}:
 	default:
@@ -120,9 +132,11 @@ func (rt *ResettableTimer) ResetWithTTK(t time.Duration) {
 func (rt *ResettableTimer) Stop() {
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
-	rt.closed = true
-	//关闭channel间接使已失效的runLoop关闭
-	close(rt.resetCh)
+	if !rt.closed {
+		rt.closed = true
+		//关闭channel间接使已失效的runLoop关闭
+		close(rt.resetCh)
+	}
 	rt.timer.Stop()
 }
 
