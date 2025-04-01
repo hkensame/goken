@@ -3,6 +3,7 @@ package hostgen
 import (
 	"net"
 	"strconv"
+	"strings"
 
 	"github.com/hkensame/goken/pkg/errors"
 	"github.com/hkensame/goken/pkg/log"
@@ -52,46 +53,42 @@ func GetUsagePort() int {
 
 }
 
-// 解析传入的host,选取(若无适合的ip或port则自动生成一个可用的)两者中适合的地址(即可使用的ip与port),
 func ResolveHost(host string) (string, error) {
 	ip, port, err := net.SplitHostPort(host)
 	if err != nil {
-		log.Errorf("[endpoint] 无法从host中提取有效的ip或port")
+		log.Errorf("[endpoint] 无法从 host 中提取有效的 IP 或端口")
 		return "", ErrInvalidHost
 	}
 
-	//如果port为无效值则自动获取port
 	if uport, err := strconv.Atoi(port); uport <= 0 || err != nil {
 		uport = GetUsagePort()
 		port = strconv.Itoa(uport)
 	}
 
-	//如果ip与port是可用的就直接返回
-	if len(ip) > 0 && (ip != "0.0.0.0" && ip != "[::]" && ip != "::") {
+	if len(ip) > 0 && ip != "0.0.0.0" && ip != "::" && ip != "[::]" {
 		return net.JoinHostPort(ip, port), nil
 	}
 
-	//通过以下逻辑获得可使用的ip
 	ifaces, err := net.Interfaces()
 	if err != nil {
 		return "", err
 	}
-	lowest := int(^uint(0) >> 1)
-	var result net.IP
+
+	var preferredIP, fallbackIP net.IP
 	for _, iface := range ifaces {
-		if (iface.Flags & net.FlagUp) == 0 {
+		if (iface.Flags&net.FlagUp) == 0 || (iface.Flags&net.FlagLoopback) != 0 {
 			continue
 		}
-		if iface.Index < lowest || result == nil {
-			lowest = iface.Index
-		}
-		if result != nil {
+
+		if strings.HasPrefix(iface.Name, "docker") || strings.HasPrefix(iface.Name, "veth") {
 			continue
 		}
+
 		addrs, err := iface.Addrs()
 		if err != nil {
 			continue
 		}
+
 		for _, rawAddr := range addrs {
 			var ip net.IP
 			switch addr := rawAddr.(type) {
@@ -102,14 +99,25 @@ func ResolveHost(host string) (string, error) {
 			default:
 				continue
 			}
-			if isValidIPAndLocalHost(ip.String()) {
-				result = ip
+
+			if ip.To4() != nil && !ip.IsLoopback() {
+				if iface.Name == "ens33" || iface.Name == "eth0" || strings.HasPrefix(iface.Name, "enp") {
+					preferredIP = ip
+					break
+				} else if fallbackIP == nil {
+					fallbackIP = ip
+				}
 			}
 		}
 	}
-	if result != nil {
-		return net.JoinHostPort(result.String(), port), nil
+
+	if preferredIP != nil {
+		return net.JoinHostPort(preferredIP.String(), port), nil
 	}
+	if fallbackIP != nil {
+		return net.JoinHostPort(fallbackIP.String(), port), nil
+	}
+
 	return "", nil
 }
 
