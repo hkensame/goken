@@ -12,7 +12,7 @@ func (b *Block) RemainedSize() int {
 
 // 返回的下标是还未使用的body的第一个字节的seek地址
 func (b *Block) At() int {
-	offset := int(b.Header.BlockNum * int16(BlockSize))
+	offset := int(b.Header.BlockNum) * int(BlockSize)
 	return int(b.Header.UsedSize+int16(HeaderSize)) + offset
 }
 
