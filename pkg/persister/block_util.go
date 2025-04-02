@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"hash/crc32"
+	"unsafe"
 )
 
 func (b *Block) RemainedSize() int {
@@ -17,13 +18,16 @@ func (b *Block) At() int {
 }
 
 func (b *Block) Marshal() []byte {
-	buf := bytes.NewBuffer(make([]byte, 0))
+	buf := bytes.NewBuffer(make([]byte, 0, BlockSize))
 	binary.Write(buf, binary.LittleEndian, b)
 	return buf.Bytes()
 }
 
 // 可以进行checksum检查
 func (b *Block) Unmarshal(data []byte) error {
+	if b == nil {
+		b = &Block{}
+	}
 	//如果连一个头都读不到则退出
 	if len(data) < HeaderSize {
 		return ErrUnmarshalFailed
@@ -50,8 +54,8 @@ func (b *Block) Unmarshal(data []byte) error {
 }
 
 func (b *Block) SetCheckSum() {
-	headbuf := bytes.NewBuffer(make([]byte, 0))
-	bodybuf := bytes.NewBuffer(make([]byte, 0))
+	headbuf := bytes.NewBuffer(make([]byte, 0, unsafe.Sizeof(BlockHeader{})))
+	bodybuf := bytes.NewBuffer(make([]byte, 0, BodySize))
 
 	binary.Write(headbuf, binary.LittleEndian, b.Header)
 	b.HeaderCheckSum = crc32.ChecksumIEEE(headbuf.Bytes())
@@ -60,8 +64,8 @@ func (b *Block) SetCheckSum() {
 }
 
 func (b *Block) CheckSum() bool {
-	headbuf := bytes.NewBuffer(make([]byte, 0))
-	bodybuf := bytes.NewBuffer(make([]byte, 0))
+	headbuf := bytes.NewBuffer(make([]byte, 0, unsafe.Sizeof(BlockHeader{})))
+	bodybuf := bytes.NewBuffer(make([]byte, 0, BodySize))
 
 	binary.Write(headbuf, binary.LittleEndian, b.Header)
 	if b.HeaderCheckSum != crc32.ChecksumIEEE(headbuf.Bytes()) {
@@ -73,4 +77,18 @@ func (b *Block) CheckSum() bool {
 	}
 
 	return true
+}
+
+func (b *Block) GetEntries() [][]byte {
+	p := 0
+	res := make([][]byte, b.Header.EntryNums)
+	for i := range b.Header.EntryNums {
+		entrySize := int16(binary.LittleEndian.Uint16(b.EntriesData[p : p+2]))
+		p += 2
+		res[i] = make([]byte, entrySize)
+		copy(res[i], b.EntriesData[p:p+int(entrySize)])
+		p += int(entrySize)
+
+	}
+	return res
 }

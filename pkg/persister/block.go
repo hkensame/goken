@@ -85,7 +85,6 @@ func NewBlockEntry(b []byte) *BlockEntry {
 }
 
 func (be *BlockEntry) Encode() []byte {
-	be.EntrySize = int16(len(be.Data))
 	buf := make([]byte, 2+be.EntrySize)
 	binary.LittleEndian.PutUint16(buf[:2], uint16(be.EntrySize))
 	copy(buf[2:], be.Data)
@@ -129,56 +128,4 @@ func MustNewBlockManager(path string, blocks int) *BlockManager {
 		}
 	}
 	return bm
-}
-
-// 判断现在使用的Block是否还够用,不够用就换新的Block
-// 这样可能会造成每个block都有可能会有几个到几百个字节未使用,但保证了每个条目都落在一个块下
-func (bm *BlockManager) CheckStatus(needSize int) error {
-	//如果容量已经不足则先落盘数据
-	if bm.UsagedBlock.RemainedSize()-needSize < 0 {
-		if err := bm.WriteBlock(); err != nil {
-			return err
-		}
-		bm.md.UsagedBlockNum++
-		//需要扩充文件
-		if bm.md.UsagedBlockNum > bm.md.BlockNums {
-			bm.md.BlockNums *= 2
-			if err := bm.Expansion(int(bm.md.BlockNums)); err != nil {
-				return err
-			}
-		}
-		if err := bm.StoreHeaderData(); err != nil {
-			return err
-		}
-		if err := bm.SeekBlock(); err != nil {
-			return err
-		}
-		//清空数组
-		bm.UsagedBlock.EntriesData = [BodySize]byte{}
-		bm.UsagedBlock.Header.EntryNums = 0
-		bm.UsagedBlock.Header.BlockNum = int16(bm.md.UsagedBlockNum)
-		bm.UsagedBlock.Header.UsedSize = 0
-		//bm.dirty = true
-	}
-	return nil
-}
-
-func (bm *BlockManager) WriteEntry(d []byte) error {
-	be := NewBlockEntry(d)
-	if err := bm.CheckStatus(int(be.EntrySize)); err != nil {
-		return err
-	}
-	bm.dirty = true
-	bm.UsagedBlock.Header.EntryNums++
-	copy(bm.UsagedBlock.EntriesData[bm.UsagedBlock.Header.UsedSize:], be.Encode())
-	bm.UsagedBlock.Header.UsedSize += be.EntrySize
-	return nil
-}
-
-// 要求必须写成功到磁盘中
-func (bm *BlockManager) MustWriteEntry(d []byte) error {
-	if err := bm.WriteBlock(); err != nil {
-		return err
-	}
-	return bm.Flush()
 }
