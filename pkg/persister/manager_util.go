@@ -2,8 +2,6 @@ package persister
 
 import (
 	"bufio"
-	"bytes"
-	"encoding/binary"
 	"io"
 
 	"github.com/hkensame/goken/pkg/log"
@@ -83,7 +81,11 @@ func (bm *BlockManager) WriteBlock() error {
 	writer := bufio.NewWriterSize(bm.File, BlockSize)
 	defer writer.Flush()
 	bm.UsagedBlock.SetCheckSum()
-	return bm.write(writer, bm.UsagedBlock.Marshal())
+	if err := bm.write(writer, bm.UsagedBlock.Marshal()); err != nil {
+		return err
+	}
+	bm.dirty = false
+	return nil
 }
 
 func (bm *BlockManager) ReadBlock() ([]byte, error) {
@@ -109,40 +111,6 @@ func (bm *BlockManager) Flush() error {
 		return err
 	}
 	return nil
-}
-
-func (bm *BlockManager) StoreHeaderData() error {
-	buf := make([]byte, 0)
-	buf = binary.LittleEndian.AppendUint32(buf, uint32(bm.md.BlockNums))
-	buf = binary.LittleEndian.AppendUint32(buf, uint32(bm.md.UsagedBlockNum))
-
-	if err := bm.seek(0, io.SeekStart); err != nil {
-		return err
-	}
-	if err := bm.write(bm.File, buf); err != nil {
-		return err
-	}
-	return bm.sync()
-}
-
-func (bm *BlockManager) LoadHeaderData() error {
-	buf := make([]byte, HeaderBlockSize)
-
-	if err := bm.seek(0, io.SeekStart); err != nil {
-		return err
-	}
-	if _, err := io.ReadFull(bm.File, buf); err != nil {
-		return err
-	}
-
-	b := bytes.NewBuffer(buf)
-
-	binary.Read(b, binary.LittleEndian, bm.md)
-	data, err := bm.ReadBlock()
-	if err != nil {
-		return err
-	}
-	return bm.UsagedBlock.Unmarshal(data)
 }
 
 // 这个函数会返回一个blockReader用于读取每个block内的所有entries
@@ -200,26 +168,26 @@ func (bm *BlockManager) CheckStatus(needSize int) error {
 		bm.UsagedBlock.Header.EntryNums = 0
 		bm.UsagedBlock.Header.BlockNum = int16(bm.md.UsagedBlockNum)
 		bm.UsagedBlock.Header.UsedSize = 0
-		//bm.dirty = true
+		bm.dirty = true
 	}
 	return nil
 }
 
 func (bm *BlockManager) WriteEntry(d []byte) error {
-	be := NewBlockEntry(d)
+	be := newBlockEntry(d)
 	if err := bm.CheckStatus(int(be.EntrySize + 2)); err != nil {
 		return err
 	}
 	bm.dirty = true
 	bm.UsagedBlock.Header.EntryNums++
-	copy(bm.UsagedBlock.EntriesData[bm.UsagedBlock.Header.UsedSize:], be.Encode())
+	copy(bm.UsagedBlock.EntriesData[bm.UsagedBlock.Header.UsedSize:], be.encode())
 	bm.UsagedBlock.Header.UsedSize += be.EntrySize + 2
 	return nil
 }
 
 // 要求必须写成功到磁盘中
 func (bm *BlockManager) MustWriteEntry(d []byte) error {
-	if err := bm.WriteBlock(); err != nil {
+	if err := bm.WriteEntry(d); err != nil {
 		return err
 	}
 	return bm.Flush()

@@ -40,10 +40,6 @@ type BlockHeader struct {
 	UsedSize int16
 	// 对应的块号
 	BlockNum int16
-	// // block的元数据大小
-	// BlockHeaderSize int16
-	// // block的body数据大小
-	// BlockBodySize int16
 	// 现在已经存储的条目数
 	EntryNums int16
 	Align     int16
@@ -77,14 +73,14 @@ type BlockManager struct {
 	dirty bool
 }
 
-func NewBlockEntry(b []byte) *BlockEntry {
+func newBlockEntry(b []byte) *BlockEntry {
 	return &BlockEntry{
 		Data:      b,
 		EntrySize: int16(len(b)),
 	}
 }
 
-func (be *BlockEntry) Encode() []byte {
+func (be *BlockEntry) encode() []byte {
 	buf := make([]byte, 2+be.EntrySize)
 	binary.LittleEndian.PutUint16(buf[:2], uint16(be.EntrySize))
 	copy(buf[2:], be.Data)
