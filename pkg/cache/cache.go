@@ -20,9 +20,10 @@ var (
 	ErrBadExpireTime   = errors.New("分布式缓存的过期时间不得早于本地缓存")
 	ErrDeleteKeyFailed = errors.New("key删除失败")
 	ErrSetKeyFailed    = errors.New("key设置失败")
-	ErrBadMultiCache   = errors.New("分布式锁暂不可用")
+	ErrBadMultiCache   = errors.New("multiCache暂不可用")
 	ErrDirtyData       = errors.New("读入的数据为脏数据")
 	ErrMarshalFailed   = errors.New("marshal 失败")
+	ErrUnmarshalFailed = errors.New("unmarshal 失败")
 )
 
 type LocalCache struct {
@@ -49,6 +50,14 @@ type MultiCache struct {
 
 	logger *otelzap.Logger
 	Logger *otelzap.SugaredLogger
+}
+
+func (c *MultiCache) GetLocalCache() *LocalCache {
+	return c.localCache
+}
+
+func (c *MultiCache) GetDistributedCache() *DistributedCache {
+	return c.distributedCache
 }
 
 // func (c *MultiCache) Get(ctx context.Context, key string) ([]byte, error) {

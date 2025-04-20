@@ -1,9 +1,12 @@
 package cache
 
 import (
+	"bytes"
 	"context"
+	"strconv"
 	"time"
 
+	"github.com/buger/jsonparser"
 	"github.com/cenkalti/backoff/v5"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/redis/go-redis/v9"
@@ -23,6 +26,7 @@ const (
 	DataStr    = "data"
 	KeyStr     = "key"
 	ExpireStr  = "exp"
+	ActionStr  = "act"
 )
 
 const batchSize = 100
@@ -77,22 +81,56 @@ type CacheUpdateMessage struct {
 	Version int64  `json:"vrs"`
 }
 
+// 逻辑跟joinMdData一样
+func (c CacheUpdateMessage) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	buf.WriteString(`{"`)
+	buf.WriteString("vrs")
+	buf.WriteString(`":`)
+	buf.WriteString(strconv.FormatInt(c.Version, 10))
+
+	if len(c.Data) > 0 {
+		buf.WriteString(`,"data":`)
+		buf.Write(c.Data)
+	}
+
+	buf.WriteString(`,"key":"`)
+	buf.WriteString(c.Key)
+	buf.WriteString(`","act":"`)
+	buf.WriteString(c.Action)
+	buf.WriteString(`"}`)
+	return buf.Bytes(), nil
+}
+
+func (c *CacheUpdateMessage) UnmarshalJSON(data []byte) error {
+	var err error
+	if c.Version, err = jsonparser.GetInt(data, "vrs"); err != nil {
+		return ErrUnmarshalFailed
+	}
+
+	if c.Key, err = jsonparser.GetString(data, "key"); err != nil {
+		return ErrUnmarshalFailed
+	}
+
+	if c.Action, err = jsonparser.GetString(data, "act"); err != nil {
+		return ErrUnmarshalFailed
+	}
+
+	if val, t, _, err := jsonparser.Get(data, "data"); err == nil && t != jsonparser.NotExist {
+		c.Data = make([]byte, len(val))
+		copy(c.Data, val)
+	} else {
+		c.Data = nil
+	}
+	return nil
+}
+
 func (c *MultiCache) SetWithPubSub(ctx context.Context, key string, value []byte) error {
 	if err := c.distributedCache.SetEx(ctx, key, value, c.ExpireTime).Err(); err != nil {
-		c.Logger.Errorf("[multi-cache] 往distributed cache中设置数据失败 err= %v", err)
+		c.Logger.Errorf("[multi-cache] 往distributed cache中设置数据失败 err = %v", err)
 		return ErrBadMultiCache
 	}
-	msg := CacheUpdateMessage{
-		Key:     key,
-		Action:  "set",
-		Data:    value,
-		Version: 0,
-	}
-	b, err := jsoniter.Marshal(msg)
-	if err != nil {
-		c.Logger.Errorf("[multi-cache] json marshal消息失败 err=%v", err)
-		return ErrMarshalFailed
-	}
+	b := c.joinMdData(key, 0, value, "set")
 	c.publishHelper(ctx, CacheChannel, b)
 	return nil
 }
@@ -101,26 +139,14 @@ func (c *MultiCache) SetWithVersion(ctx context.Context, key string, val []byte,
 	if !c.UseVersionControll {
 		return c.SetWithPubSub(ctx, key, val)
 	}
-
-	data := CacheUpdateMessage{
-		Version: version,
-		Data:    val,
-		Key:     key,
-		Action:  "set",
-	}
-	b, err := jsoniter.Marshal(&data)
-	if err != nil {
-		c.Logger.Errorf("[multi-cache] json marshal消息失败 err=%v", err)
-		return ErrMarshalFailed
-	}
-
+	b := c.joinMdData(key, version, val, "set")
 	if res := c.distributedCache.Eval(ctx, setWithVersion, []string{key}, b, version, c.ExpireTime); res.Err() == nil {
 		affected, _ := res.Int()
 		if affected == 1 {
 			c.publishHelper(ctx, CacheChannel, b)
 		}
 	} else {
-		c.Logger.Errorf("[multi-cache] set key 失败, err=%v", err)
+		c.Logger.Errorf("[multi-cache] set key 失败, err = %v", res.Err())
 		return ErrSetKeyFailed
 	}
 	return nil
@@ -134,14 +160,10 @@ func (c *MultiCache) DelWithPubSub(ctx context.Context, keys ...string) error {
 			end = len(keys)
 		}
 		batch := keys[i:end]
-		var msg []*CacheUpdateMessage = make([]*CacheUpdateMessage, 0, end-i)
+		var msg [][]byte = make([][]byte, 0, end-i)
 
 		for _, key := range batch {
-			msg = append(msg, &CacheUpdateMessage{
-				Key:     key,
-				Action:  "delete",
-				Version: 0,
-			})
+			msg = append(msg, c.joinMdData(key, 0, nil, "delete"))
 		}
 
 		if err := c.distributedCache.Del(ctx, batch...).Err(); err != nil {
@@ -150,11 +172,8 @@ func (c *MultiCache) DelWithPubSub(ctx context.Context, keys ...string) error {
 		}
 
 		for _, v := range msg {
-			if b, err := jsoniter.Marshal(v); err == nil {
-				c.publishHelper(ctx, CacheChannel, b)
-			} else {
-				c.Logger.Errorf("[multi-cache] json marshal消息失败 err=%v", err)
-			}
+			c.publishHelper(ctx, CacheChannel, v)
+
 		}
 	}
 	return nil
@@ -175,19 +194,15 @@ func (c *MultiCache) DelWithVersion(ctx context.Context, keys []string, vrs []in
 			end = len(keys)
 		}
 		batch := keys[i:end]
-		vals := make([]interface{}, 0, end-i)
-		var msg []*CacheUpdateMessage = make([]*CacheUpdateMessage, 0, end-i)
+		vrss := make([]interface{}, 0, end-i)
+		var msg [][]byte = make([][]byte, 0, end-i)
 
-		for _, key := range batch {
-			msg = append(msg, &CacheUpdateMessage{
-				Key:     key,
-				Action:  "delete",
-				Version: 0,
-			})
-			vals = append(vals, 0)
+		for i, key := range batch {
+			msg = append(msg, c.joinMdData(key, vrs[i], nil, "delete"))
+			vrss = append(vrss, vrs[i])
 		}
 
-		if res := c.distributedCache.Eval(ctx, deleteWithVersion, batch, vals...); res.Err() == nil {
+		if res := c.distributedCache.Eval(ctx, deleteWithVersion, batch, vrss...); res.Err() == nil {
 			if i, _ := res.Int(); i != len(batch) {
 				c.Logger.Warnf("[multi-cache] 预定删除%dkey,实际删除%d个key", len(batch), i)
 			}
@@ -197,11 +212,7 @@ func (c *MultiCache) DelWithVersion(ctx context.Context, keys []string, vrs []in
 		}
 
 		for _, v := range msg {
-			if b, err := jsoniter.Marshal(v); err == nil {
-				c.publishHelper(ctx, CacheChannel, b)
-			} else {
-				c.Logger.Errorf("[multi-cache] json marshal消息失败, err = %v", err)
-			}
+			c.publishHelper(ctx, CacheChannel, v)
 		}
 
 	}
@@ -219,7 +230,8 @@ func (c *MultiCache) SubscribeUpdate(ctx context.Context) {
 				return
 			case msg := <-ch:
 				var update CacheUpdateMessage
-				if err := jsoniter.Unmarshal([]byte(msg.Payload), &update); err != nil {
+				td := []byte(msg.Payload)
+				if err := jsoniter.Unmarshal(td, &update); err != nil {
 					c.Logger.Errorf("解析来自订阅channel的缓存更新消息失败, err = %v", err)
 					continue
 				}
@@ -236,7 +248,7 @@ func (c *MultiCache) SubscribeUpdate(ctx context.Context) {
 				switch update.Action {
 				case "set":
 					if checkNew() {
-						c.localCache.Set(update.Key, update.Data)
+						c.localCache.Set(update.Key, td)
 					}
 
 				case "delete":

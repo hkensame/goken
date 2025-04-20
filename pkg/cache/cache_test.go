@@ -1,52 +1,32 @@
-package cache_test
+package cache
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
-	"gihub.com/hkensame/goken/pkg/cache" // 替换为你的包名
-
-	"github.com/allegro/bigcache/v3"
+	"github.com/allegro/bigcache"
 	"github.com/redis/go-redis/v9"
 )
-
-type stdLogger struct{}
-
-func (stdLogger) Errorf(format string, args ...interface{}) {
-	fmt.Printf("[ERROR] "+format+"\n", args...)
-}
-func (stdLogger) Warnf(format string, args ...interface{}) {
-	fmt.Printf("[WARN] "+format+"\n", args...)
-}
-
-func newLocalCache() cache.LocalCache {
-	bc, _ := bigcache.NewBigCache(bigcache.DefaultConfig(10 * time.Minute))
-	return &cache.BigCacheWrapper{Cache: bc}
-}
 
 func TestMultiCache_SetGetDelWithVersion(t *testing.T) {
 	ctx := context.Background()
 
 	// 初始化 MultiCache
-	mc := &cache.MultiCache{
-		distributedCache: redis.NewClusterClient(&redis.ClusterOptions{
-			Addrs: []string{
-				"192.168.199.128:6379",
-				"192.168.199.128:6380",
-				"192.168.199.128:6381",
-				"192.168.199.128:6382",
-				"192.168.199.128:6383",
-				"192.168.199.128:6384",
-			},
-			Password: "123",
-		}),
-		localCache:         newLocalCache(),
-		Logger:             stdLogger{},
-		ExpireTime:         30 * time.Second,
-		UseVersionControll: true,
+	cconf := redis.ClusterOptions{}
+	cconf.Addrs = []string{
+		"192.168.199.128:6379",
+		"192.168.199.128:6380",
+		"192.168.199.128:6381",
+		"192.168.199.128:6382",
+		"192.168.199.128:6383",
+		"192.168.199.128:6384",
 	}
+	cconf.Password = "123"
+
+	bc := bigcache.DefaultConfig(10 * time.Minute)
+
+	mc := MustNewMultiCache(&cconf, &bc, WithExpireTime(12*time.Minute))
 
 	// 启动订阅协程
 	mc.SubscribeUpdate(ctx)

@@ -20,10 +20,10 @@ func NewAsyncProducer(namesrv []string, conf *sarama.Config) sarama.AsyncProduce
 	return producer
 }
 
-func NewSyncConsumer(namesrv []string, conf *sarama.Config) sarama.Consumer {
-	producer, err := sarama.NewSyncProducer(namesrv, conf)
-	if err != nil {
-		panic(err)
-	}
-	return producer
-}
+// func NewSyncConsumer(namesrv []string, conf *sarama.Config) sarama.Consumer {
+// 	producer, err := sarama.NewSyncProducer(namesrv, conf)
+// 	if err != nil {
+// 		panic(err)
+// 	}
+// 	return producer
+// }

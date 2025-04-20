@@ -1,11 +1,17 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/allegro/bigcache"
+	"github.com/hkensame/goken/pkg/cache"
+	"github.com/hkensame/goken/pkg/log"
+	"github.com/redis/go-redis/v9"
 )
 
 type ListNode struct {
@@ -61,28 +67,82 @@ type Node struct {
 	Next  *Node
 }
 
-func pairSum(head *ListNode) int {
-	ans := 0
-	var f func(l *ListNode) *ListNode
+func main() {
 
-	f = func(l *ListNode) *ListNode {
-		h := l
-		if l.Next != nil {
-			h = f(l.Next)
-		}
-		ans = max(l.Val+h.Val, ans)
-		return h.Next
+	ctx := context.Background()
+
+	// 初始化 MultiCache
+	cconf := redis.ClusterOptions{}
+	cconf.Addrs = []string{
+		"127.0.0.1:6379",
+		"127.0.0.1:6380",
+		"127.0.0.1:6381",
+		"127.0.0.1:6382",
+		"127.0.0.1:6383",
+		"127.0.0.1:6384",
+	}
+	cconf.Password = "123"
+	cconf.ReadOnly = true
+	cconf.RouteByLatency = true
+
+	bc := bigcache.DefaultConfig(10 * time.Minute)
+
+	mc := cache.MustNewMultiCache(&cconf, &bc, cache.WithExpireTime(12*time.Minute))
+
+	// 启动订阅协程
+	mc.SubscribeUpdate(ctx)
+
+	// 给一些缓冲时间让订阅准备好
+	time.Sleep(1 * time.Second)
+
+	key := "user1"
+	val := []byte(`{"name":"Tom","age":25}`)
+
+	err := mc.SetWithVersion(ctx, key, val, 1)
+	if err != nil {
+		log.Fatalf("SetWithVersion 失败: %v", err)
 	}
 
-	f(head)
-	return ans
-}
+	// 等待 pub/sub 消息传递
+	time.Sleep(1 * time.Second)
 
-func main() {
-	t1 := timekeep(print)
-	t2 := timekeep(test1)
+	// 检查 localCache 是否生效
+	data, err := mc.GetLocalCache().Get(key)
+	if err != nil {
+		log.Fatalf("本地缓存未命中: %v", err)
+	}
+	log.Infof("本地缓存数据: %s", data)
 
-	fmt.Println(t1, '\n', t2)
+	// 写入一个版本号较小的数据，应该不会覆盖
+	err = mc.SetWithVersion(ctx, key, []byte(`{"name":"Tom","age":111}`), 0)
+	if err != nil {
+		log.Fatalf("低版本SetWithVersion执行出错: %v", err)
+	}
+	// 再等一下订阅
+	time.Sleep(1 * time.Second)
+
+	// 再取本地缓存，验证版本是否被覆盖
+	data, _ = mc.GetLocalCache().Get(key)
+	version := mc.GetVersion(data)
+	if version != 1 {
+		log.Fatalf("本地缓存被低版本覆盖了，当前版本=%d", version)
+	}
+	fmt.Println(data)
+
+	// 测试删除（失败场景：版本过小不应删除）
+	err = mc.DelWithVersion(ctx, []string{key}, []int64{99})
+	if err != nil {
+		log.Fatalf("DelWithVersion 执行出错: %v", err)
+	}
+	time.Sleep(2 * time.Second)
+
+	_, err = mc.GetLocalCache().Get(key)
+	if err != nil && err == bigcache.ErrEntryNotFound {
+		log.Infof("预期缓存已经不存在,ok")
+	} else {
+		log.Infof("预期缓存仍存在，版本未满足删除条件: %v", err)
+	}
+
 }
 
 func print() {

@@ -1,6 +1,7 @@
 package gserver
 
 import (
+	"fmt"
 	"net/url"
 
 	"github.com/gin-gonic/gin"
@@ -42,7 +43,7 @@ func (s *Server) Authorize() gin.HandlerFunc {
 			}
 			code := tk.GetCode()
 			store := code + ":" + res.CodeChallenge + ":" + string(res.CodeChallengeMethod)
-			//s.Manager.
+			fmt.Println(store)
 		case oauth2.Token.String():
 		case IDToken:
 		}

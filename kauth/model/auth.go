@@ -118,11 +118,3 @@ func WithLogger(l *otelzap.Logger) OptionFunc {
 func (r *Auther) Serve() error {
 	return r.Server.Serve()
 }
-
-func (r *Auther) inject() {
-	r.OServer.SetClientAuthorizedHandler(r.checkAllowedGrant)
-	r.OServer.SetClientScopeHandler(r.checkAllowedScope)
-	r.OServer.SetClientInfoHandler(r.extractClientInfo)
-	// 用户是否登录,跳转授权页
-	r.OServer.SetUserAuthorizationHandler(r.userAuthorizeHandler)
-}

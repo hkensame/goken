@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"sync"
 	"time"
 
 	"github.com/allegro/bigcache"
@@ -49,6 +50,8 @@ func MustNewMultiCache(dc *redis.ClusterOptions, lc *bigcache.Config, opts ...Op
 	if lc.LifeWindow >= c.ExpireTime {
 		panic(ErrBadExpireTime)
 	}
+
+	c.Mtx = &sync.Mutex{}
 
 	if c.logger == nil {
 		c.logger = log.Logger()
