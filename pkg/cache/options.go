@@ -51,7 +51,7 @@ func MustNewMultiCache(dc *redis.ClusterOptions, lc *bigcache.Config, opts ...Op
 		panic(ErrBadExpireTime)
 	}
 
-	c.Mtx = &sync.Mutex{}
+	c.Mtx = &sync.RWMutex{}
 
 	if c.logger == nil {
 		c.logger = log.Logger()

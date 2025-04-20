@@ -129,6 +129,29 @@ func main() {
 	}
 	fmt.Println(data)
 
+	dt, err := mc.GetInPubSub(ctx, key)
+	if err != nil {
+		log.Fatalf("本地缓存获取不到要的信息")
+	} else {
+		fmt.Println("本地缓存获取得要的信息", string(dt))
+	}
+
+	mc.GetLocalCache().Delete(key)
+
+	dt, err = mc.GetInPubSub(ctx, key)
+	if err != nil {
+		log.Fatalf("分布式缓存获取不到要的信息")
+	} else {
+		fmt.Println("分布式缓存获取得到要的信息", string(dt))
+	}
+
+	dt, err = mc.GetLocalCache().Get(key)
+	if err != nil {
+		log.Fatalf("本地缓存无法在get中被同步")
+	} else {
+		fmt.Println("本地缓存可以在get中被同步", string(dt))
+	}
+
 	// 测试删除（失败场景：版本过小不应删除）
 	err = mc.DelWithVersion(ctx, []string{key}, []int64{99})
 	if err != nil {

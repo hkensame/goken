@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"context"
 	"strconv"
-	"time"
 
 	"github.com/buger/jsonparser"
 	"github.com/cenkalti/backoff/v5"
+	"github.com/hkensame/goken/pkg/log"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/redis/go-redis/v9"
-	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 )
 
 /*
@@ -81,52 +81,8 @@ type CacheUpdateMessage struct {
 	Version int64  `json:"vrs"`
 }
 
-// 逻辑跟joinMdData一样
-func (c CacheUpdateMessage) MarshalJSON() ([]byte, error) {
-	var buf bytes.Buffer
-	buf.WriteString(`{"`)
-	buf.WriteString("vrs")
-	buf.WriteString(`":`)
-	buf.WriteString(strconv.FormatInt(c.Version, 10))
-
-	if len(c.Data) > 0 {
-		buf.WriteString(`,"data":`)
-		buf.Write(c.Data)
-	}
-
-	buf.WriteString(`,"key":"`)
-	buf.WriteString(c.Key)
-	buf.WriteString(`","act":"`)
-	buf.WriteString(c.Action)
-	buf.WriteString(`"}`)
-	return buf.Bytes(), nil
-}
-
-func (c *CacheUpdateMessage) UnmarshalJSON(data []byte) error {
-	var err error
-	if c.Version, err = jsonparser.GetInt(data, "vrs"); err != nil {
-		return ErrUnmarshalFailed
-	}
-
-	if c.Key, err = jsonparser.GetString(data, "key"); err != nil {
-		return ErrUnmarshalFailed
-	}
-
-	if c.Action, err = jsonparser.GetString(data, "act"); err != nil {
-		return ErrUnmarshalFailed
-	}
-
-	if val, t, _, err := jsonparser.Get(data, "data"); err == nil && t != jsonparser.NotExist {
-		c.Data = make([]byte, len(val))
-		copy(c.Data, val)
-	} else {
-		c.Data = nil
-	}
-	return nil
-}
-
 func (c *MultiCache) SetWithPubSub(ctx context.Context, key string, value []byte) error {
-	if err := c.distributedCache.SetEx(ctx, key, value, c.ExpireTime).Err(); err != nil {
+	if err := c.distributedCache.SetEx(ctx, key, c.joinMdData("", 0, value), c.ExpireTime).Err(); err != nil {
 		c.Logger.Errorf("[multi-cache] 往distributed cache中设置数据失败 err = %v", err)
 		return ErrBadMultiCache
 	}
@@ -139,10 +95,11 @@ func (c *MultiCache) SetWithVersion(ctx context.Context, key string, val []byte,
 	if !c.UseVersionControll {
 		return c.SetWithPubSub(ctx, key, val)
 	}
-	b := c.joinMdData(key, version, val, "set")
-	if res := c.distributedCache.Eval(ctx, setWithVersion, []string{key}, b, version, c.ExpireTime); res.Err() == nil {
+	res := c.distributedCache.Eval(ctx, setWithVersion, []string{key}, c.joinMdData("", version, val), version, c.ExpireTime)
+	if res.Err() == nil {
 		affected, _ := res.Int()
 		if affected == 1 {
+			b := c.joinMdData(key, version, val, "set")
 			c.publishHelper(ctx, CacheChannel, b)
 		}
 	} else {
@@ -248,6 +205,10 @@ func (c *MultiCache) SubscribeUpdate(ctx context.Context) {
 				switch update.Action {
 				case "set":
 					if checkNew() {
+						//删去要存储的额外信息
+						//之前的unmarshal成功则一定保证这里删除是成功的
+						td, _ = sjson.DeleteBytes(td, ActionStr)
+						td, _ = sjson.DeleteBytes(td, KeyStr)
 						c.localCache.Set(update.Key, td)
 					}
 
@@ -276,28 +237,82 @@ func (c *MultiCache) publishHelper(ctx context.Context, channel string, message 
 
 }
 
-func (c *MultiCache) newBackoffPolicy() *backoff.ExponentialBackOff {
-	policy := backoff.NewExponentialBackOff()
-	policy.InitialInterval = 1 * time.Second
-	policy.MaxInterval = 16 * time.Second
-	policy.Multiplier = 2
-	return policy
+func (c *MultiCache) GetInPubSub(ctx context.Context, key string) ([]byte, error) {
+	c.Mtx.RLock()
+	data, err := c.localCache.Get(key)
+	c.Mtx.RUnlock()
+	if err != nil {
+		log.Warnf("[multi-cache] %s未命中本地缓存", key)
+	} else {
+		return c.GetData(data), nil
+	}
+
+	res := c.distributedCache.Get(ctx, key)
+	if err := res.Err(); err != nil {
+		if err == redis.Nil {
+			log.Warnf("[multi-cache] %s未命中分布式缓存", key)
+			return nil, ErrRecordNotFound
+		}
+		log.Errorf("[multi-cache] 从distributed cache中获取数据失败 err = %v", err)
+		return nil, ErrBadMultiCache
+	}
+
+	//因为整个multiCache都只支持存[]byte,故不用担心这里出错
+	data, _ = res.Bytes()
+
+	//因为在上面的过程中可能存在有其他携程写入了localCache,所以需要再比较一次
+	c.Mtx.Lock()
+	nd, err := c.localCache.Get(key)
+	if err == nil && c.GetVersion(nd) > c.GetVersion(data) {
+		c.Mtx.Unlock()
+		return c.GetData(nd), nil
+	} else {
+		c.localCache.Set(key, data)
+		c.Mtx.Unlock()
+		return data, nil
+	}
 }
 
-// 默认情况下如果没有version字段则默认认为字段version为0
-func (c *MultiCache) GetVersion(data []byte) int64 {
-	res := gjson.GetBytes(data, VersionStr)
-	if !res.Exists() {
-		return 0
+// 逻辑跟joinMdData一样
+func (c CacheUpdateMessage) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	buf.WriteString(`{"`)
+	buf.WriteString("vrs")
+	buf.WriteString(`":`)
+	buf.WriteString(strconv.FormatInt(c.Version, 10))
+
+	if len(c.Data) > 0 {
+		buf.WriteString(`,"data":`)
+		buf.Write(c.Data)
 	}
-	return res.Int()
+
+	buf.WriteString(`,"key":"`)
+	buf.WriteString(c.Key)
+	buf.WriteString(`","act":"`)
+	buf.WriteString(c.Action)
+	buf.WriteString(`"}`)
+	return buf.Bytes(), nil
 }
 
-// 与getVersion无异,只是参数换为string
-func (c *MultiCache) GetVersionInString(data string) int64 {
-	res := gjson.Get(data, VersionStr)
-	if !res.Exists() {
-		return 0
+func (c *CacheUpdateMessage) UnmarshalJSON(data []byte) error {
+	var err error
+	if c.Version, err = jsonparser.GetInt(data, "vrs"); err != nil {
+		return ErrUnmarshalFailed
 	}
-	return res.Int()
+
+	if c.Key, err = jsonparser.GetString(data, "key"); err != nil {
+		return ErrUnmarshalFailed
+	}
+
+	if c.Action, err = jsonparser.GetString(data, "act"); err != nil {
+		return ErrUnmarshalFailed
+	}
+
+	if val, t, _, err := jsonparser.Get(data, "data"); err == nil && t != jsonparser.NotExist {
+		c.Data = make([]byte, len(val))
+		copy(c.Data, val)
+	} else {
+		c.Data = nil
+	}
+	return nil
 }

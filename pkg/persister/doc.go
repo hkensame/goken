@@ -9,4 +9,5 @@ package persister
 	3. b.firstDeleteEntryAt int16 第一条删除的entry的下标位置,且每个entry加入时而外用一个bit(从size里拿)来判断是否删除
 		因为一个block最多有4096字节,所以size虽有16bit但是用不完所有bit
 
+	4.WHY NOT golang.org/x/exp/mmap
 */

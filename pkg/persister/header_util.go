@@ -8,8 +8,7 @@ import (
 	"github.com/hkensame/goken/pkg/errors"
 )
 
-//Header Block的存储默认是立马刷新而不使用缓存
-
+// Header Block的存储默认是立马刷新而不使用缓存
 func (bm *BlockManager) storeHeaderBlock(other []byte) error {
 	buf := make([]byte, 0, HeaderBlockSize+len(other))
 	buf = binary.LittleEndian.AppendUint32(buf, uint32(bm.md.BlockNums))

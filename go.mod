@@ -57,6 +57,7 @@ require (
 	github.com/microsoft/go-mssqldb v1.7.2 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230126093431-47fa9a501578 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
+	github.com/tidwall/sjson v1.2.5 // indirect
 	golang.org/x/sync v0.12.0 // indirect
 	gorm.io/driver/postgres v1.5.9 // indirect
 	gorm.io/driver/sqlserver v1.5.4 // indirect

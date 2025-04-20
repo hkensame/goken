@@ -35,6 +35,11 @@ type DistributedCache struct {
 	*redis.ClusterClient
 }
 
+type CacheEntry struct {
+	Version int64  `json:"vrs"`
+	Data    []byte `json:"data"`
+}
+
 type MultiCache struct {
 	localCache       *LocalCache
 	distributedCache *DistributedCache
@@ -46,7 +51,7 @@ type MultiCache struct {
 	UseVersionControll bool
 	RocketmqConsumer   rocketmq.PushConsumer
 	//这个mtx只是保证本地缓存更新时是一致的,防止老版本更新慢于新版本更新
-	Mtx *sync.Mutex
+	Mtx *sync.RWMutex
 
 	logger *otelzap.Logger
 	Logger *otelzap.SugaredLogger
