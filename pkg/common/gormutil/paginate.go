@@ -1,8 +1,7 @@
-package paginate
+package gormutil
 
 import "gorm.io/gorm"
 
-// gorm给出的分页函数的最佳实践
 func GormPaginate(pagesNum int, pageSize int) func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
 		if pagesNum < 0 {

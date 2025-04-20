@@ -1,4 +1,4 @@
-package rockmq
+package grocketmq
 
 import (
 	"context"

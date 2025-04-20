@@ -1,0 +1,119 @@
+syntax = "proto3";
+package kcasbin;
+option go_package = "./;proto";
+
+import "google/protobuf/empty.proto";
+
+service Authorization{
+    rpc AddPolicies(MatchPolicies)returns(google.protobuf.Empty);
+    rpc RemovePolicies(MatchPolicies)returns(google.protobuf.Empty);
+    rpc UpdatePolicies(UpdatePoliciesReq)returns(google.protobuf.Empty);
+    rpc FindPoliciesItems(FindPoliciesFilterReq)returns(MatchPolicies);
+    //rpc FindPolicies(google.protobuf.Empty)returns(Policies);
+
+    rpc AddGroupingPolicies(GroupingPolicies) returns (google.protobuf.Empty);
+    rpc RemoveGroupingPolicies(GroupingPolicies) returns (google.protobuf.Empty);
+    rpc UpdateGroupingPolicies(UpdateGroupingPoliciesReq)returns(google.protobuf.Empty);
+    rpc FindGroupingPoliciesItems(FindGroupingPoliciesFilterReq)returns(GroupingPolicies);
+
+    rpc Authorize(AuthorizeReq)returns(AuthorizeRes);
+
+    rpc GetUserRoles(GetUserRolesReq) returns (GetUserRolesRes);
+    rpc GetRoleUsers(GetRoleUsersReq) returns (GetRoleUsersRes);
+
+    //GetAllRoles(),GetAllUsers()
+}
+
+message FindPoliciesFilterReq{
+    string pname = 1;
+    string pagesNum = 2;
+    string pageSize = 3;
+}
+
+
+message MatchPolicies{
+    repeated MatchPolicy mp = 1;
+    string pname = 2;
+}
+
+message UpdatePoliciesReq{
+    MatchPolicies oldPolicies = 1;
+    MatchPolicies newPolicies = 2;
+    string pname = 3;
+}
+
+//这里考虑在api中def之外将policy的名字冗余出来,强制将其作为参数
+message MatchPolicy{
+    //policy名字
+    string pname = 1;
+    string sub = 2;
+    string dom = 3;
+    string obj = 4;
+    //作为结果表示是否允许通行
+    string eft = 5;
+}
+
+
+
+
+
+message FindGroupingPoliciesFilterReq{
+    string gname = 1;
+    string pagesNum = 2;
+    string pageSize = 3;
+}
+
+
+message UpdateGroupingPoliciesReq{
+    GroupingPolicies oldPolicies = 1;
+    GroupingPolicies newPolicies = 2;
+    string gname = 3;
+}
+
+message GroupingPolicies{
+    repeated GroupingPolicy gp = 1;
+    string gname = 2;
+}
+
+message GroupingPolicy{
+    string gname = 1;
+    string rsub = 2;
+    string psub = 3;
+    string dom = 4;
+}
+
+
+
+
+
+
+message AuthorizeReq{
+    string sub = 1;
+    string obj = 2;
+    string dom = 3;
+}
+
+message AuthorizeRes{
+    bool ok = 1;
+    string detail = 2;
+}
+
+
+
+
+
+message GetUserRolesReq{
+    string user = 1;
+}
+
+message GetUserRolesRes{
+    repeated string roles = 1; 
+}
+
+message GetRoleUsersReq{
+    string role = 1;
+}
+
+message GetRoleUsersRes{
+    repeated string users = 1;
+}

@@ -40,6 +40,10 @@ func WriteResponse(c *gin.Context, code int, msg string, data interface{}, abort
 	newJsonResult(code, msg, data).WriteResponse(c, abort)
 }
 
+func WriteError(c *gin.Context, code int, err error, abort bool) {
+	newJsonResult(code, err.Error(), nil)
+}
+
 func WriteRpcError(c *gin.Context, err error, abort bool) {
 	e := errors.ExtractCodeErrorFromGRPC(err)
 	if cerr := errors.ExtractCoderFromError(e); cerr != nil {
@@ -68,4 +72,13 @@ func translateErr(err validator.ValidationErrors, trans ut.Translator) map[strin
 	}
 
 	return f(err.Translate(trans))
+}
+
+func MustIsMethod(ctx *gin.Context, meth ...string) bool {
+	for _, v := range meth {
+		if v == ctx.Request.Method {
+			return true
+		}
+	}
+	return false
 }

@@ -5,8 +5,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/hkensame/goken/pkg/cache"
-
 	"github.com/golang-jwt/jwt/v4"
 )
 
@@ -64,12 +62,6 @@ var (
 	// ErrMissingSecretKey 表示缺少密钥
 	ErrMissingSecretKey = errors.New("secret key is required")
 
-	// ErrForbidden 没有访问该资源的权限
-	ErrForbidden = errors.New("you don't have permission to access this resource")
-
-	// ErrFailedAuthentication 表示身份验证失败,可能是错误的用户名或密码
-	ErrFailedAuthentication = errors.New("incorrect Username or Password")
-
 	// ErrFailedTokenCreation 表示JWT令牌创建失败,原因未知
 	ErrFailedTokenCreation = errors.New("failed to create JWT Token")
 
@@ -79,19 +71,22 @@ var (
 	// ErrExpiredRefreshToken 表示刷新令牌已过期,无法刷新
 	ErrExpiredRefreshToken = errors.New("refresh token is expired")
 
-	// ErrEmptyToken 在使用 HTTP 头部进行认证时,如果 `Authorization` 头为空,则会抛出该错误
-	ErrEmptyToken = errors.New("token header is empty")
-
 	// ErrMissingExpField 表示令牌缺少 `exp`（过期时间）字段
 	ErrMissingExpField = errors.New("missing exp field")
 
-	// ErrWrongFormatOfExp 表示 `exp` 字段格式错误,必须为 `float64`
-	ErrWrongFormatOfExp = errors.New("exp must be float64 format")
+	// ErrInvalidToken 表示token无效
+	ErrInvalidToken = errors.New("表示token无效 is invalid")
 
-	// ErrInvalidToken 表示认证头无效,例如可能使用了错误的 Realm 名称
-	ErrInvalidToken = errors.New("auth header is invalid")
+	// ErrInvalidSigningAlgorithm 表示签名算法无效,必须是 HS256、HS384、HS512、RS256、RS384 或 RS512
+	ErrInvalidSigningAlgorithm = errors.New("invalid signing algorithm")
 
-	// ErrEmptyQueryToken 在 URL 查询参数中进行认证时,如果令牌变量为空,则会抛出该错误
+	// ErrTokenStringInvalid 表示tokenstring是无效的
+	ErrTokenStringInvalid = errors.New("token string invalid")
+)
+
+var (
+
+	// ErrEmptyQueryToken 在 URL 查询参数或Form Data中进行认证时,如果令牌变量为空,则会抛出该错误
 	ErrEmptyQueryToken = errors.New("query token is empty")
 
 	// ErrEmptyCookieToken 在使用 Cookie 进行认证时,如果令牌 Cookie 为空,则会抛出该错误
@@ -100,11 +95,8 @@ var (
 	// ErrEmptyParamToken 在使用 URL 路径参数进行认证时,如果参数为空,则会抛出该错误
 	ErrEmptyParamToken = errors.New("parameter token is empty")
 
-	// ErrInvalidSigningAlgorithm 表示签名算法无效,必须是 HS256、HS384、HS512、RS256、RS384 或 RS512
-	ErrInvalidSigningAlgorithm = errors.New("invalid signing algorithm")
-
-	//
-	ErrTokenStringInvalid = errors.New("token string invalid")
+	// ErrEmptyHeadToken 在使用 HTTP 头部进行认证时,如果 `Authorization` 头为空,则会抛出该错误
+	ErrEmptyHeadToken = errors.New("token header is empty")
 )
 
 func WithTokenInside(t string) JwtOption {
@@ -176,11 +168,5 @@ func WithExpField(expField string) JwtOption {
 func WithKeyFunc(keyFunc func(t *jwt.Token) (interface{}, error)) JwtOption {
 	return func(mw *GinJWTMiddleware) {
 		mw.KeyFunc = keyFunc
-	}
-}
-
-func WithCache(c *cache.MultiCache) JwtOption {
-	return func(gj *GinJWTMiddleware) {
-		gj.Cache = c
 	}
 }

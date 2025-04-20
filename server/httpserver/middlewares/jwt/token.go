@@ -5,8 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hkensame/goken/pkg/cache"
-
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"
 )
@@ -16,7 +14,7 @@ import (
 // 用户可以通过向LoginHandler发送json请求来获取token,然后需要在http-header的Authentication中传递该token,
 // 例如:Authorization:Bearer XXX_TOKEN_XXX
 type GinJWTMiddleware struct {
-	// jwt所属的域名,也可以用于签发者姓名
+	// 议题,也可以存储其他信息
 	Realm string
 
 	//受众,用于适配jwt的aud
@@ -44,8 +42,6 @@ type GinJWTMiddleware struct {
 	// 此字段允许客户端在MaxRefresh时间过去之前刷新其 token,
 	// 默认为一天,传入数值为0则关闭Refresh模式
 	MaxRefresh time.Duration
-
-	Cache *cache.MultiCache
 
 	//TokenInside是一个字符串,用于指定token在请求中的位置,默认值为"header",允许有多个值,用,分隔
 	TokenInside string
@@ -85,12 +81,6 @@ type GinJWTMiddleware struct {
 	ExpField string
 }
 
-func (mw *GinJWTMiddleware) AuthorizationHandler(c *gin.Context) {
-	//claims:=ExtractClaimsFromContext(c)
-	//identity:=c.GetString(mw.IdentityKey)
-	c.Next()
-}
-
 // 用于生成jwt.Token
 func (mw *GinJWTMiddleware) NewToken(keyvalue ...string) (string, time.Time, error) {
 	token := jwt.New(jwt.GetSigningMethod(mw.SigningAlgorithm))
@@ -117,48 +107,7 @@ func (mw *GinJWTMiddleware) NewToken(keyvalue ...string) (string, time.Time, err
 	if err != nil {
 		return "", time.Time{}, err
 	}
-
 	return tokenString, expire, nil
-}
-
-func (mw *GinJWTMiddleware) jwtFromHeader(c *gin.Context, key string) (string, error) {
-	token := c.Request.Header.Get(key)
-	if token == "" {
-		return "", ErrEmptyToken
-	}
-	return token, nil
-}
-
-func (mw *GinJWTMiddleware) jwtFromQuery(c *gin.Context, key string) (string, error) {
-	token := c.Query(key)
-	if token == "" {
-		return "", ErrEmptyQueryToken
-	}
-	return token, nil
-}
-
-func (mw *GinJWTMiddleware) jwtFromCookie(c *gin.Context, key string) (string, error) {
-	cookie, _ := c.Cookie(key)
-	if cookie == "" {
-		return "", ErrEmptyCookieToken
-	}
-	return cookie, nil
-}
-
-func (mw *GinJWTMiddleware) jwtFromParam(c *gin.Context, key string) (string, error) {
-	token := c.Param(key)
-	if token == "" {
-		return "", ErrEmptyParamToken
-	}
-	return token, nil
-}
-
-func (mw *GinJWTMiddleware) jwtFromForm(c *gin.Context, key string) (string, error) {
-	token := c.PostForm(key)
-	if token == "" {
-		return "", ErrEmptyParamToken
-	}
-	return token, nil
 }
 
 // 从gin.Context中获取jwt.Token
@@ -167,7 +116,7 @@ func (mw *GinJWTMiddleware) getTokenFromCtx(c *gin.Context) (*jwt.Token, error) 
 	var err error
 
 	//如果存在refresh-token就直接使用refresh-token
-	if v, exist := c.Get("refresh-token"); exist {
+	if v, exist := c.Get(RefreshToken); exist {
 		key := v.(string)
 		token = string(key)
 	} else {
@@ -235,7 +184,7 @@ func (mw *GinJWTMiddleware) GetClaimsFromContext(c *gin.Context) (jwt.MapClaims,
 
 // 从gin.Context中反解出对应的MapClaims
 func ExtractClaimsFromContext(c *gin.Context) jwt.MapClaims {
-	claims, exists := c.Get("jwt-claims")
+	claims, exists := c.Get(JwtClaims)
 	if !exists {
 		return make(jwt.MapClaims)
 	}
@@ -280,4 +229,44 @@ func (mw *GinJWTMiddleware) SetCookie(c *gin.Context, token string) {
 	if mw.CookieSameSite != 0 {
 		c.SetSameSite(mw.CookieSameSite)
 	}
+}
+
+func (mw *GinJWTMiddleware) jwtFromHeader(c *gin.Context, key string) (string, error) {
+	token := c.Request.Header.Get(key)
+	if token == "" {
+		return "", ErrEmptyHeadToken
+	}
+	return token, nil
+}
+
+func (mw *GinJWTMiddleware) jwtFromCookie(c *gin.Context, key string) (string, error) {
+	cookie, _ := c.Cookie(key)
+	if cookie == "" {
+		return "", ErrEmptyCookieToken
+	}
+	return cookie, nil
+}
+
+func (mw *GinJWTMiddleware) jwtFromParam(c *gin.Context, key string) (string, error) {
+	token := c.Param(key)
+	if token == "" {
+		return "", ErrEmptyParamToken
+	}
+	return token, nil
+}
+
+func (mw *GinJWTMiddleware) jwtFromForm(c *gin.Context, key string) (string, error) {
+	token := c.PostForm(key)
+	if token == "" {
+		return "", ErrEmptyQueryToken
+	}
+	return token, nil
+}
+
+func (mw *GinJWTMiddleware) jwtFromQuery(c *gin.Context, key string) (string, error) {
+	token := c.Query(key)
+	if token == "" {
+		return "", ErrEmptyQueryToken
+	}
+	return token, nil
 }

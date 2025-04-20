@@ -220,13 +220,11 @@ func (s *Server) Serve() error {
 			return nil
 		},
 		func(err error) {
-			// 发送终止信号,而不是 close(sign)
 			select {
 			case sign <- syscall.SIGINT:
 			default:
 			}
 		},
 	)
-
 	return g.Run()
 }
