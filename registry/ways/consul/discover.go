@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hkensame/goken/pkg/dstruct/queue"
 	"github.com/hkensame/goken/pkg/log"
-	"github.com/hkensame/goken/pkg/queue"
 	"github.com/hkensame/goken/registry"
 
 	"github.com/hashicorp/consul/api"

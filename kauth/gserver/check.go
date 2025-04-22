@@ -2,7 +2,6 @@ package gserver
 
 import (
 	"encoding/base64"
-	"net/url"
 	"strings"
 
 	"github.com/go-oauth2/oauth2/v4"
@@ -16,137 +15,94 @@ import (
 	3.在/token请求中检查请求体是否有权利获得token
 */
 
-func (s *Server) CheckAllowedClientRequst(req *AuthorizedInfo) (err error) {
+// 对收到的AuthorizedInfo的初步检查,与数据库底层记录的数据是否一致
+func (s *Server) CheckAllowedAuthorizeRequst(req *AuthorizedInfo) error {
 	infoAny, _ := req.Ctx.Get(ClientInfoStr)
 	info, ok := infoAny.(ClientInfo)
 	if !ok {
 		return errors.ErrInvalidRequest
 	}
 
-	if !s.checkResponseType(req.ResponseType.String(), info) {
-		return errors.ErrUnsupportedResponseType
-	}
-
-	if !s.checkRedirectURL(req.RedirectURI) {
-		return errors.ErrInvalidRedirectURI
-	}
-
-	if !s.checkScope(req.Scope, info) {
-		return errors.ErrInvalidScope
-	}
-
-	if err := s.checkCodeChallenge(req); err != nil {
+	var err error
+	if err = s.checkResponseType(req.ResponseType.String(), info); err != nil {
 		return err
 	}
-	return nil
-}
 
-func (s *Server) CheckAllowedTokenRequest(tk *TokenInfo) error {
-	if tk.GrantType == oauth2.Code.String() {
-		if tk.Code == "" {
-			return errors.ErrInvalidAuthorizeCode
-		}
-		if !s.checkRedirectURL(tk.RedirectURI) {
-			return errors.ErrInvalidRedirectURI
-		}
-
-	} else if tk.GrantType == oauth2.ClientCredentials.String() {
-		if tk.ClientSecret == "" {
-			return errors.ErrInvalidRequest
-		}
-	} else {
-		if tk.RefreshToken == "" {
-			return errors.ErrInvalidRefreshToken
-		}
+	if err = s.checkRedirectURL(req.RedirectURI, info); err != nil {
+		return err
 	}
 
-	if s.Config.ForcePKCE && tk.CodeVerifier == "" {
-		return errors.ErrMissingCodeVerifier
+	if err = s.checkScope(req, info); err != nil {
+		return err
 	}
 
-	//这里应该根据不同的模式到不同的位置查询?
-	if tk.Scope != "" {
+	if err = s.checkCodeChallenge(req, info); err != nil {
+		return err
 	}
 
-	return nil
-}
-
-func (s *Server) checkHttpMethod(method string) error {
-	if !(method == "POST" || (s.Config.AllowGetAccessRequest && method == "GET")) {
-		return errors.ErrInvalidRequest
+	if err := s.checkAccessType(req.AccessType); err != nil {
+		return err
 	}
+
+	if err := s.checkState(req.AccessType); err != nil {
+		return err
+	}
+
+	if err := s.checkPrompt(req.AccessType); err != nil {
+		return err
+	}
+	req.IsPublic = info.IsPublic()
 	return nil
 }
 
 // TODO: 后续需要逻辑定义,解析req中scopes里的格式和内容
 // 暂时只处理这样的格式: email,mobile,nickname或email mobile nickname
-func (s *Server) checkScope(scopes string, info ClientInfo) bool {
-	scopes = strings.ReplaceAll(strings.TrimSpace(strings.ToLower(scopes)), ",", " ")
-	fields := strings.Fields(scopes)
+func (s *Server) checkScope(req *AuthorizedInfo, info ClientInfo) error {
+	req.Scope = strings.ReplaceAll(strings.TrimSpace(strings.ToLower(req.Scope)), ",", " ")
+	fields := strings.Fields(req.Scope)
 	elems := make(map[string]struct{})
 	for _, v := range info.GetScopes() {
 		elems[v] = struct{}{}
 	}
 	for _, v := range fields {
 		if _, ok := elems[v]; !ok {
-			return false
+			return errors.ErrInvalidScope
 		}
 	}
-	return true
+	return nil
 }
 
-func (s *Server) checkResponseType(rt string, info ClientInfo) bool {
+func (s *Server) checkResponseType(rt string, info ClientInfo) error {
 	for _, v := range info.GetResponseTypes() {
 		if v == rt {
-			return true
+			return nil
 		}
 	}
-	return false
+	return errors.ErrUnsupportedResponseType
 }
 
-// 检查请求中是否是允许的CodeChallengeMethod
-func (s *Server) checkCodeChallengeMethod(ccm oauth2.CodeChallengeMethod) bool {
-	for _, c := range s.Config.AllowedCodeChallengeMethods {
-		if c == ccm {
-			return true
-		}
+func (s *Server) checkCodeChallenge(req *AuthorizedInfo, info ClientInfo) error {
+	// TODO: 这里先不考虑 id_token 模式
+	if !s.Config.UsePKCE {
+		return nil
 	}
-	return false
-}
 
-func (s *Server) checkCodeChallenge(req *AuthorizedInfo) error {
-	if s.Config.ForcePKCE && req.CodeChallenge == "" {
+	//使用了/authorize接口且UsePKCE则必定意味着要带code-challenge信息
+	if (req.CodeChallenge == "" || req.CodeChallengeMethod == "") && (info.IsPublic() || s.Config.UsePKCE) {
 		return errors.ErrCodeChallengeRquired
 	}
 
-	// 非强制PKCE时,如果未提供code_challenge则直接跳过验证
-	if req.CodeChallenge == "" {
-		return nil
+	if req.CodeChallengeMethod != oauth2.CodeChallengeS256 {
+		return errors.ErrUnsupportedCodeChallengeMethod
 	}
 
 	if len(req.CodeChallenge) < 43 || len(req.CodeChallenge) > 128 {
 		return errors.ErrInvalidCodeChallengeLen
 	}
 
-	if req.CodeChallengeMethod == "" || (req.CodeChallengeMethod != oauth2.CodeChallengePlain &&
-		req.CodeChallengeMethod != oauth2.CodeChallengeS256) {
-		return errors.ErrUnsupportedCodeChallengeMethod
-	}
-
-	if req.CodeChallengeMethod == oauth2.CodeChallengeS256 {
-		if _, err := base64.RawURLEncoding.DecodeString(req.CodeChallenge); err != nil {
-			return errors.ErrInvalidCodeChallenge
-		}
-	}
-
-	if err := s.checkAccessType(req.AccessType); err != nil {
-		return err
-	}
-	if err := s.checkState(req.AccessType); err != nil {
-		return err
-	}
-	if err := s.checkPrompt(req.AccessType); err != nil {
-		return err
+	//默认客户端生成pkce时会对code-challenge进行一次base64序列化,这里测试看是否是base64格式
+	if _, err := base64.RawURLEncoding.DecodeString(req.CodeChallenge); err != nil {
+		return errors.ErrInvalidCodeChallenge
 	}
 
 	return nil
@@ -170,13 +126,29 @@ func (s *Server) checkAccessType(accessType string) error {
 	if accessType == "" || validAccessType[accessType] {
 		return nil
 	}
-	return errors.ErrInvalidRequest
+	return errors.ErrAccessDenied
 }
 
-func (s *Server) checkRedirectURL(us string) bool {
-	_, err := url.Parse(us)
-	if err != nil {
-		return false
+func (s *Server) checkRedirectURL(us string, info ClientInfo) error {
+	for _, v := range info.GetRedirectURIs() {
+		if us == v {
+			return nil
+		}
 	}
-	return true
+	return errors.ErrInvalidRedirectURI
 }
+
+/*
+	Token Check函数
+*/
+
+// func (s *Server) checkClientSercet(req *AuthorizedInfo, info ClientInfo) error {
+// 	//使用code不需要验证sercet
+// 	if req.ResponseType == oauth2.Code {
+// 		return nil
+// 	}
+// 	if req.ClientSecret == info.GetSecret() {
+// 		return nil
+// 	}
+// 	return errors.ErrInvalidRequest
+// }

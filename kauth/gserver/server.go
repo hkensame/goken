@@ -6,6 +6,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-oauth2/oauth2/v4"
 	"github.com/go-oauth2/oauth2/v4/manage"
+	"github.com/go-redis/cache/v9"
+	"github.com/redis/go-redis/v9"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 )
 
 const (
@@ -14,7 +17,14 @@ const (
 )
 
 const (
-	IDToken = "id_token"
+	IDTokenSecure = "code id_token"
+)
+
+const (
+	PKCEKey = "pkce:"
+	CCKey   = "cck:"
+	CCMKey  = "ccmk:"
+	URLKey  = "rdr-url:"
 )
 
 var validPrompts = map[string]bool{
@@ -38,12 +48,14 @@ type AuthorizedInfo struct {
 	State               string                     `form:"state" binding:"required"`
 	CodeChallenge       string                     `form:"code_challenge"`
 	CodeChallengeMethod oauth2.CodeChallengeMethod `form:"code_challenge_method"`
-	Prompt              string                     `form:"prompt"`
-	AccessType          string                     `form:"access_type"`
-	//暂时不知道后续用不用得到,先放在这
-	nonce  string
-	UserID string       `form:"-"`
-	Ctx    *gin.Context `form:"-"`
+	//与oidc有关
+	Prompt     string `form:"prompt"`
+	AccessType string `form:"access_type"`
+	//不允许支持implicit,不需要nonce
+	//nonce  string
+	IsPublic bool         `form:"-"`
+	UserID   string       `form:"-"`
+	Ctx      *gin.Context `form:"-"`
 }
 
 type TokenInfo struct {
@@ -60,18 +72,23 @@ type TokenInfo struct {
 	Scope        string `form:"scope"`
 	// 使用refresh_token模式时必填
 	RefreshToken string `form:"refresh_token"`
-	// 可选自定义access_token过期时间,但只能比默认的过期时间的小
+	// 可选自定义access_token过期时间,但只能比默认的过期时间的小,暂时不知道该字段的意义是什么
 	AccessTokenExp time.Duration `form:"access_token_exp" binding:"omitempty,lt=86400"`
 	UserID         string        `form:"-"`
 	Ctx            *gin.Context  `form:"-"`
+	//作为标识是否需要PKCE,在check函数中填充
+	needPKCE bool
 }
 
 type Server struct {
-	Config  *Config
+	Config  *config
 	Manager *manage.Manager //oauth2.Manager
+	Cache   *cache.Cache
+	Logger  *otelzap.SugaredLogger
+	logger  *otelzap.Logger
 }
 
-type Config struct {
+type config struct {
 	//tokenType标识生成的token存储的前缀,默认为Bearer
 	TokenType string
 	//tokenPlace标识生成的token存储的位置
@@ -84,19 +101,19 @@ type Config struct {
 	AllowedGrantTypes []oauth2.GrantType
 	// 标识允许的GCodeChallengeMethods
 	AllowedCodeChallengeMethods []oauth2.CodeChallengeMethod
-	//是否强制使用PKCE
-	ForcePKCE bool
+	//要求public客户端或单页前端使用pkce,暂时隐蔽字段不允许关闭pkce
+	UsePKCE bool
+	//code模式下,code的时效时间,默认为10分钟
+	CodeTTL time.Duration
 }
 
-func NewDefaultServer(manager *manage.Manager) *Server {
-	return NewServer(NewConfig(), manager)
-}
-
-// NewServer create authorization server
-func NewServer(cfg *Config, manager *manage.Manager) *Server {
+func MustNewServer(cfg *config, manager *manage.Manager, cli redis.UniversalClient) *Server {
 	srv := &Server{
 		Config:  cfg,
 		Manager: manager,
+		Cache: cache.New(&cache.Options{
+			Redis: cli,
+		}),
 	}
 	return srv
 }
@@ -105,11 +122,11 @@ func NewServer(cfg *Config, manager *manage.Manager) *Server {
 // 且只允许ClientCredentials使用Token ResponseTypes
 // 默认也只支持CodeChallengeS256一种模式,
 // 不允许GET方法获取Token,不强制使用pkce
-func NewConfig() *Config {
-	return &Config{
+func NewConfig() *config {
+	return &config{
 		TokenType:            "Bearer",
 		TokenPlace:           "header",
-		AllowedResponseTypes: []oauth2.ResponseType{oauth2.Code, oauth2.Token},
+		AllowedResponseTypes: []oauth2.ResponseType{oauth2.Code, IDTokenSecure},
 		AllowedGrantTypes: []oauth2.GrantType{
 			oauth2.AuthorizationCode,
 			oauth2.ClientCredentials,
@@ -118,6 +135,8 @@ func NewConfig() *Config {
 		AllowedCodeChallengeMethods: []oauth2.CodeChallengeMethod{
 			oauth2.CodeChallengeS256,
 		},
+		CodeTTL: 10 * time.Minute,
+		UsePKCE: true,
 	}
 }
 
@@ -130,7 +149,7 @@ type ClientInfo interface {
 	GetUserID() string
 	GetGrantTypes() []string
 	GetScopes() []string
-	GetRedirectURI() string
+	GetRedirectURIs() []string
 	GetResponseTypes() []string
 }
 

@@ -19,8 +19,7 @@ type AuthClientInfo struct {
 	Scope         gormutil.GormList `gorm:"type:text"`
 	ResponseTypes gormutil.GormList `gorm:"type:varchar(80)"`
 	Public        bool              `gorm:"default:true"`
-	//不确定会不会用到
-	//RedirectURIs gormutil.GormList
+	RedirectURIs  gormutil.GormList `gorm:"type:text"`
 }
 
 type Model struct {
@@ -76,4 +75,8 @@ func (c *AuthClientInfo) GetUserID() string {
 
 func (c *AuthClientInfo) GetResponseType() []string {
 	return c.ResponseTypes
+}
+
+func (c *AuthClientInfo) GetRedirectURIs() []string {
+	return c.RedirectURIs
 }

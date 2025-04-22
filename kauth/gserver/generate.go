@@ -24,16 +24,16 @@ func (s *Server) generateCode(req *AuthorizedInfo) (authToken oauth2.TokenInfo, 
 
 func (s *Server) generateToken(req *TokenInfo) (authToken oauth2.TokenInfo, err error) {
 	tgr := &oauth2.TokenGenerateRequest{
-		ClientID:       req.ClientID,
-		Scope:          req.Scope,
-		RedirectURI:    req.RedirectURI,
-		Request:        req.Ctx.Request,
-		ClientSecret:   req.ClientSecret,
-		Code:           req.Code,
-		CodeVerifier:   req.CodeVerifier,
-		Refresh:        req.RefreshToken,
-		AccessTokenExp: req.AccessTokenExp,
-		UserID:         req.UserID,
+		ClientID:     req.ClientID,
+		Scope:        req.Scope,
+		RedirectURI:  req.RedirectURI,
+		Request:      req.Ctx.Request,
+		ClientSecret: req.ClientSecret,
+		Code:         req.Code,
+		CodeVerifier: req.CodeVerifier,
+		Refresh:      req.RefreshToken,
+		//AccessTokenExp: req.AccessTokenExp,
+		UserID: req.UserID,
 	}
 	res, err := s.Manager.GenerateAccessToken(req.Ctx.Request.Context(), oauth2.GrantType(req.GrantType), tgr)
 	//这里可以根据不同的grant模式返回不同的错误(比如client模式可以返回更详尽的错误类型)

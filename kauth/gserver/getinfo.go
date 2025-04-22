@@ -37,7 +37,7 @@ func (s *Server) GetAuthorizedInfo(c *gin.Context) (*AuthorizedInfo, error) {
 // 从/token请求中获取TokenInfo信息
 func (s *Server) GetTokenInfo(c *gin.Context) (*TokenInfo, error) {
 	res := &TokenInfo{}
-	if err := s.checkHttpMethod(c.Request.Method); err != nil {
+	if err := s.checkGetTokenMethod(c.Request.Method); err != nil {
 		return nil, err
 	}
 	if err := c.ShouldBind(res); err != nil {
@@ -46,4 +46,11 @@ func (s *Server) GetTokenInfo(c *gin.Context) (*TokenInfo, error) {
 
 	res.Ctx = c
 	return res, nil
+}
+
+func (s *Server) checkGetTokenMethod(method string) error {
+	if !(method == "POST" || (s.Config.AllowGetAccessRequest && method == "GET")) {
+		return errors.ErrInvalidRequest
+	}
+	return nil
 }

@@ -9,19 +9,19 @@ import (
 	"github.com/hkensame/goken/server/httpserver/middlewares/jwt"
 )
 
-func (r *Auther) AuthorizeHandler(c *gin.Context) {
-	err := r.OServer.HandleAuthorizeRequest(c.Writer, c.Request)
-	if err != nil {
-		httputil.WriteResponse(c, 400, "", err, true)
-	}
-}
+// func (r *Auther) AuthorizeHandler(c *gin.Context) {
+// 	err := r.OServer.HandleAuthorizeRequest(c.Writer, c.Request)
+// 	if err != nil {
+// 		httputil.WriteResponse(c, 400, "", err, true)
+// 	}
+// }
 
-func (r *Auther) NewTokenHandler(c *gin.Context) {
-	err := r.OServer.HandleTokenRequest(c.Writer, c.Request)
-	if err != nil {
-		httputil.WriteResponse(c, 400, "", err, true)
-	}
-}
+// func (r *Auther) NewTokenHandler(c *gin.Context) {
+// 	err := r.OServer.HandleTokenRequest(c.Writer, c.Request)
+// 	if err != nil {
+// 		httputil.WriteResponse(c, 400, "", err, true)
+// 	}
+// }
 
 func (r *Auther) AddClientInfoHandler(c *gin.Context) {
 
@@ -83,12 +83,4 @@ func (r *Auther) authenticationHandler(c *gin.Context) {
 
 	//以便于后续如果token过期时能找到redirectHost
 	c.Set(jwt.RedirectHost, rediretHost)
-}
-
-// nonce 检查
-func (r *Auther) RouterRegister() {
-	r.Server.Engine.GET("/authorize", r.AuthorizeHandler)
-	r.Server.Engine.POST("/token", r.NewTokenHandler)
-	r.Server.Engine.POST("/clientinfos", r.AddClientInfoHandler)
-	r.Server.Engine.GET("/authenticate", r.authenticationHandler, r.Jwt.RefreshHandler, r.Jwt.JwtAuthHandler)
 }

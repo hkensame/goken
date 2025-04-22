@@ -8,9 +8,8 @@ import (
 	"context"
 
 	"github.com/gin-gonic/gin"
-	"github.com/go-oauth2/oauth2/v4"
 	"github.com/go-oauth2/oauth2/v4/manage"
-	"github.com/go-oauth2/oauth2/v4/server"
+	"github.com/hkensame/goken/kauth/gserver"
 	"github.com/hkensame/goken/pkg/errors"
 	"github.com/hkensame/goken/server/httpserver"
 	"github.com/hkensame/goken/server/httpserver/middlewares/jwt"
@@ -27,7 +26,7 @@ var (
 type Auther struct {
 	Cache         *rediscache.TokenStore
 	Manager       *manage.Manager
-	OServer       *server.Server
+	OServer       *gserver.Server
 	Server        *httpserver.Server
 	Jwt           *jwt.GinJWTMiddleware
 	DB            *GormClientStore
@@ -60,28 +59,15 @@ func MustNewRedisAuther(host string, rdb *redis.Client, jwt *jwt.GinJWTMiddlewar
 	cfg.RefreshTokenExp = r.Jwt.MaxRefreshFunc(nil)
 	cfg.AccessTokenExp = r.Jwt.TimeoutFunc(nil)
 	r.Manager.SetAuthorizeCodeTokenCfg(cfg)
-
+	r.Manager.SetClientTokenCfg(cfg)
+	//r.Manager.SetRefreshTokenCfg()
 	if r.DB != nil {
 		r.Manager.MapClientStorage(r.DB)
 	}
 
-	//AllowedGrantTypes说明
-	//AuthorizationCode	拿到了 code 后要换 token
-	//Password	传统用户登录(账号+密码) 现在几乎不使用
-	//ClientCredentials	机器对机器 / 服务对服务调用
-	//RefreshToken	使用旧 token 获取新 token
-	conf := server.NewConfig()
-	conf.AllowedResponseTypes = []oauth2.ResponseType{oauth2.Code}
-	conf.AllowedGrantTypes = []oauth2.GrantType{
-		oauth2.AuthorizationCode,
-		//oauth2.PasswordCredentials,
-		oauth2.ClientCredentials,
-		//oauth2.Refreshing,
-	}
-	conf.AllowGetAccessRequest = true
-	conf.AllowedCodeChallengeMethods = []oauth2.CodeChallengeMethod{oauth2.CodeChallengeS256}
-	conf.ForcePKCE = true
-	r.OServer = server.NewServer(conf, r.Manager)
+	conf := gserver.NewConfig()
+
+	r.OServer = gserver.MustNewServer(conf, r.Manager, rdb)
 
 	r.Server = httpserver.MustNewServer(context.Background(), host)
 

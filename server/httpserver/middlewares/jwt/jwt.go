@@ -100,10 +100,10 @@ func (mw *GinJWTMiddleware) refreshToken(c *gin.Context) (string, time.Time, err
 
 	expire := mw.TimeFunc().Add(mw.TimeoutFunc(claims))
 	newClaims[mw.ExpField] = expire.Unix()
-	newClaims["orig_iat"] = mw.TimeFunc().Unix()
+	//newClaims["orig_iat"] = mw.TimeFunc().Unix()
 	newClaims["nbf"] = claims["orig_iat"]
 	newClaims["iat"] = claims["orig_iat"]
-	newClaims["rfs_exp"] = expire.Add(mw.MaxRefreshFunc(claims)).Unix()
+	//newClaims["rfs_exp"] = expire.Add(mw.MaxRefreshFunc(claims)).Unix()
 	c.Set(JwtClaims, newClaims)
 
 	tokenString, err := newToken.SignedString(mw.Key)
