@@ -2,138 +2,172 @@ package jwt
 
 import (
 	"net/http"
-	"time"
 
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/hkensame/goken/pkg/common/httputil"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v4"
 )
 
 const (
-	RedirectHost string = "rediect-host"
-	RefreshToken string = "refresh-token"
-	JwtClaims    string = "jwt-claims"
+	RedirectKey     = "rediect-host"
+	RefreshTokenKey = "refresh-token"
+	AccessTokenKey  = "access_token"
+	JwtClaimsKey    = "jwt_claims"
 )
 
-// gin-jwt中间件的对外使用api,该中间件会对每一个被拦截的请求都检测jwt是否认证成功
-// 亦包括对用户权限的检测
-func (mw *GinJWTMiddleware) JwtAuthHandler(c *gin.Context) {
-	var err error
-	var code int
+const (
+	InForm   = "form"
+	InJson   = "json"
+	InHeader = "header"
+	InQuery  = "query"
+)
 
-	claims, err := mw.GetClaimsFromContext(c)
-	if err != nil {
-		httputil.WriteResponse(c, http.StatusUnauthorized, err.Error(), nil, mw.UseAbort)
+// 标准声明 (Standard Claims)
+const (
+	// 受众,标识Token的目标接收方(如:["web","mobile"])
+	AudKey = "aud"
+	// 过期时间(Expiration Time),Token失效的时间戳
+	ExpKey = "exp"
+	// Token的唯一标识(用于防止重放攻击)
+	//JtiKey = "jti"
+	// 签发时间(Issued At),Token签发的时间戳
+	IatKey = "iat"
+	// 签发者(Issuer),标识Token的签发主体(如:"auth.example.com")
+	IssKey = "iss"
+	// 生效时间(Not Before),在此时间之前Token无效
+	NbfKey = "nbf"
+	// 主题(Subject),标识Token的主体(如用户ID)
+	SubKey = "sub"
+	// 原始签发时间(用于刷新Token时校验)
+	OrigIatKey = "orig_iat"
+	// Token类型(如:"access"、"refresh")
+	TokenTypeKey = "typ"
+)
+
+// gin-jwt中间件的对外使用的api,该中间件会对每一个被拦截的请求都检测jwt是否是valid
+// TODO:后续估计要结合oauth来实现/login和/check
+func (mw *GinJWTMiddleware) JwtAuthHandler(c *gin.Context) {
+	if err := mw.authAccessToken(c); err != nil {
+		if hostAny, ok := c.Get(RedirectKey); ok {
+			host, _ := hostAny.(string)
+			c.Redirect(http.StatusFound, host)
+			return
+		}
+		httputil.WriteError(c, http.StatusUnauthorized, err, mw.UseAbort)
 		return
 	}
+	c.Next()
+}
 
-	//判断Token是否Expire
-	switch v := claims[mw.ExpField].(type) {
+// refresh会刷新超时但refresh token仍有用的请求,但注意,如果access token本身有误而不是过期,则直接返回错误
+func (mw *GinJWTMiddleware) RefreshHandler(c *gin.Context) {
+	if err := mw.authAccessToken(c); err == nil {
+		c.Next()
+		return
+	} else if err == ErrExpiredToken {
+		_, err := mw.authRefreshToken(c)
+		if err != nil {
+			if err == ErrExpiredRefreshToken {
+				if hostAny, ok := c.Get(RedirectKey); ok {
+					host, _ := hostAny.(string)
+					c.Redirect(http.StatusFound, host)
+					return
+				}
+			}
+			httputil.WriteError(c, http.StatusUnauthorized, err, mw.UseAbort)
+			return
+		}
+		c.Next()
+	} else {
+		httputil.WriteError(c, http.StatusUnauthorized, err, mw.UseAbort)
+		return
+	}
+}
+
+func (mw *GinJWTMiddleware) authAccessToken(c *gin.Context) error {
+	tokenStr, err := mw.getToken(c)
+	if err != nil {
+		return err
+	}
+
+	tk, err := mw.parseTokenstr(tokenStr)
+	if err != nil {
+		return err
+	}
+
+	claims, ok := tk.Claims.(jwt.MapClaims)
+	if !ok {
+		return ErrInvalidToken
+	}
+
+	switch v := claims[ExpKey].(type) {
 	case nil:
-		err = ErrMissingExpField
-		code = http.StatusBadRequest
+		return ErrInvalidToken
 	case float64:
 		if v < float64(mw.TimeFunc().Unix()) {
-			err = ErrExpiredToken
-			code = http.StatusUnauthorized
+			return ErrExpiredToken
 		}
 	case int64:
 		if v < mw.TimeFunc().Unix() {
-			err = ErrExpiredToken
-			code = http.StatusUnauthorized
+			return ErrExpiredToken
 		}
 	default:
-		err = ErrInvalidToken
-		code = http.StatusBadRequest
+		return ErrInvalidToken
 	}
 
-	if err != nil {
-		if hostAny, ok := c.Get(RedirectHost); err == ErrExpiredToken && ok {
-			host := hostAny.(string)
-			c.Redirect(http.StatusFound, host)
-		} else {
-			httputil.WriteResponse(c, code, err.Error(), nil, mw.UseAbort)
-			return
-		}
-	}
-
-	//获得登入者claims和身份并保存到context中方便后续使用
-	c.Set(JwtClaims, claims)
-	c.Next()
+	c.Set(JwtClaimsKey, claims)
+	return nil
 }
 
-// RefreshHandler作为middleware可用于验证,刷新token,刷新的token仍然是有效的
-// 刷新策略是生成的新token字符串会先放到Context中
-// 注意:默认情况下每次登入时哪怕普通token并没有过期也会刷新
-func (mw *GinJWTMiddleware) RefreshHandler(c *gin.Context) {
-	tokenString, _, err := mw.refreshToken(c)
+// 返回新的access_token或者错误
+func (mw *GinJWTMiddleware) authRefreshToken(c *gin.Context) (string, error) {
+	tokenStr, err := mw.getRefreshToken(c)
 	if err != nil {
-		if hostAny, ok := c.Get(RedirectHost); err == ErrExpiredRefreshToken && ok {
-			host := hostAny.(string)
-			c.Redirect(http.StatusFound, host)
-		} else {
-			httputil.WriteResponse(c, http.StatusUnauthorized, err.Error(), nil, mw.UseAbort)
-			return
+		return "", err
+	}
+
+	tk, err := mw.parseTokenstr(tokenStr)
+	if err != nil {
+		return "", err
+	}
+
+	claims, ok := tk.Claims.(jwt.MapClaims)
+	if !ok {
+		return "", ErrInvalidToken
+	}
+
+	switch v := claims[ExpKey].(type) {
+	case nil:
+		return "", ErrInvalidToken
+	case float64:
+		if v < float64(mw.TimeFunc().Unix()) {
+			return "", ErrExpiredRefreshToken
 		}
-	}
-	c.Set(RefreshToken, tokenString)
-	c.Header(RefreshToken, tokenString)
-	c.Next()
-}
-
-// 刷新token并检查token是否已过期
-func (mw *GinJWTMiddleware) refreshToken(c *gin.Context) (string, time.Time, error) {
-	claims, err := mw.CheckIfTokenExpire(c)
-	//如果refresh token仍旧超时则直接返回错误
-	if err != nil {
-		return "", time.Now(), err
-	}
-
-	// 创建一个新的Token,考虑到安全性还是生成新的token而不是复用
-	newToken := jwt.New(jwt.GetSigningMethod(mw.SigningAlgorithm))
-	newClaims := newToken.Claims.(jwt.MapClaims)
-
-	for key := range claims {
-		newClaims[key] = claims[key]
-	}
-
-	expire := mw.TimeFunc().Add(mw.TimeoutFunc(claims))
-	newClaims[mw.ExpField] = expire.Unix()
-	//newClaims["orig_iat"] = mw.TimeFunc().Unix()
-	newClaims["nbf"] = claims["orig_iat"]
-	newClaims["iat"] = claims["orig_iat"]
-	//newClaims["rfs_exp"] = expire.Add(mw.MaxRefreshFunc(claims)).Unix()
-	c.Set(JwtClaims, newClaims)
-
-	tokenString, err := newToken.SignedString(mw.Key)
-	if err != nil {
-		return "", time.Now(), err
-	}
-	mw.SetCookie(c, tokenString)
-	return tokenString, expire, nil
-}
-
-// 检查Token是否超时
-func (mw *GinJWTMiddleware) CheckIfTokenExpire(c *gin.Context) (jwt.MapClaims, error) {
-	token, err := mw.getTokenFromCtx(c)
-	if err != nil {
-		// 如果收到一个错误,且该错误不是ValidationErrorExpired,则返回该错误,
-		// 如果错误只是 ValidationErrorExpired,则继续执行直至检查是否能refresh
-
-		validationErr, ok := err.(*jwt.ValidationError)
-		if !ok || validationErr.Errors != jwt.ValidationErrorExpired {
-			return nil, err
+	case int64:
+		if v < mw.TimeFunc().Unix() {
+			return "", ErrExpiredRefreshToken
 		}
+	default:
+		return "", ErrInvalidToken
 	}
 
-	claims := token.Claims.(jwt.MapClaims)
-	//在json序列化时会把某些类型序列化为float64
-	expIat := claims["rfs_exp"].(float64)
-
-	if expIat < float64(mw.TimeFunc().Unix()) {
-		return nil, ErrExpiredRefreshToken
+	kv := make([]string, 0, len(claims)*2)
+	//只有newToken函数会写入claims,而伪造或错误的claims不会执行到这一行,这里就能保证v一定是string
+	for k, v := range claims {
+		sv, ok := v.(string)
+		if !ok {
+			continue
+		}
+		kv = append(kv, k, sv)
+	}
+	acctk, _, err := mw.NewToken(kv...)
+	if err != nil {
+		return "", err
 	}
 
-	return claims, nil
+	c.Header(AccessTokenKey, acctk)
+	c.Set(JwtClaimsKey, claims)
+	return acctk, nil
+
 }

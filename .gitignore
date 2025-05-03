@@ -2,3 +2,5 @@ git_add.sh
 /test/
 golangcli-lint.sh
 /GuGoTik-main
+/kauth-nouse
+/kauth_nouse

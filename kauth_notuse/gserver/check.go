@@ -1,7 +1,6 @@
 package gserver
 
 import (
-	"encoding/base64"
 	"strings"
 
 	"github.com/go-oauth2/oauth2/v4"
@@ -22,7 +21,6 @@ func (s *Server) CheckAllowedAuthorizeRequst(req *AuthorizedInfo) error {
 	if !ok {
 		return errors.ErrInvalidRequest
 	}
-
 	var err error
 	if err = s.checkResponseType(req.ResponseType.String(), info); err != nil {
 		return err
@@ -44,11 +42,13 @@ func (s *Server) CheckAllowedAuthorizeRequst(req *AuthorizedInfo) error {
 		return err
 	}
 
-	if err := s.checkState(req.AccessType); err != nil {
+	if err := s.checkState(req.State); err != nil {
+		s.Logger.Errorf("aaaawqg")
 		return err
 	}
 
 	if err := s.checkPrompt(req.AccessType); err != nil {
+		s.Logger.Errorf("aaaawqaqpromotg")
 		return err
 	}
 	req.IsPublic = info.IsPublic()
@@ -100,16 +100,11 @@ func (s *Server) checkCodeChallenge(req *AuthorizedInfo, info ClientInfo) error 
 		return errors.ErrInvalidCodeChallengeLen
 	}
 
-	//默认客户端生成pkce时会对code-challenge进行一次base64序列化,这里测试看是否是base64格式
-	if _, err := base64.RawURLEncoding.DecodeString(req.CodeChallenge); err != nil {
-		return errors.ErrInvalidCodeChallenge
-	}
-
 	return nil
 }
 
 func (s *Server) checkState(state string) error {
-	if len(state) < 8 || len(state) > 128 {
+	if len(state) < 32 || len(state) > 64 {
 		return errors.ErrInvalidRequest
 	}
 	return nil

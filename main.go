@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"math"
+	"net/url"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -62,135 +64,50 @@ type Node struct {
 }
 
 func main() {
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-	for range ticker.C {
-		fmt.Println("每秒执行一次")
+	s := "/sso/inner?state=xcv"
+	u, err := url.Parse(s)
+	if err != nil {
+		panic(err)
 	}
+	fmt.Println(u.Query().Get("state"))
+	//longestPalindrome("babad")
 }
 
-// func numDistinct(s string, t string) int {
-// 	dp := [1010][1010]int{}
-// 	l1 := len(s)
-// 	l2 := len(t)
-// 	for i := 0; i < l1; i++ {
-// 		if t[i] == s[0] {
-// 			dp[i][0] = 0
-// 		}
-// 	}
-// 	s = " " + s
-// 	t = " " + t
-// 	for i := 1; i < l1; i++ {
-// 		for j := 1; j <= i; j++ {
-// 			if s[i] == t[j] {
-// 				dp[i][j] = dp[i][j-1] + 1
-// 			} else {
-// 				dp[i][j] = dp[i][j-1]
-// 			}
-// 		}
-// 	}
-// }
+/**
+ * Definition for a binary tree node.
+ * type TreeNode struct {
+ *     Val int
+ *     Left *TreeNode
+ *     Right *TreeNode
+ * }
+ */
 
-// func main() {
+func reverse(x int) int {
+	xx := int64(x)
+	if xx == 0 {
+		return 0
+	}
+	var ixx int64
+	pos := xx < 0
+	var ans int64 = 0
+	for ixx = 1; ixx*10 < xx; ixx *= 10 {
+	}
+	for i := 1; ixx > 0; i *= 10 {
+		j := xx / ixx
+		ans += j * int64(i)
+		xx %= ixx
+		ixx /= 10
+	}
 
-// 	ctx := context.Background()
+	if ans > math.MaxInt32 {
+		return 0
+	}
 
-// 	// 初始化 MultiCache
-// 	cconf := redis.ClusterOptions{}
-// 	cconf.Addrs = []string{
-// 		"127.0.0.1:6379",
-// 		"127.0.0.1:6380",
-// 		"127.0.0.1:6381",
-// 		"127.0.0.1:6382",
-// 		"127.0.0.1:6383",
-// 		"127.0.0.1:6384",
-// 	}
-// 	cconf.Password = "123"
-// 	cconf.ReadOnly = true
-// 	cconf.RouteByLatency = true
-
-// 	bc := bigcache.DefaultConfig(10 * time.Minute)
-
-// 	mc := cache.MustNewMultiCache(&cconf, &bc, cache.WithExpireTime(12*time.Minute))
-
-// 	// 启动订阅协程
-// 	mc.SubscribeUpdate(ctx)
-
-// 	// 给一些缓冲时间让订阅准备好
-// 	time.Sleep(1 * time.Second)
-
-// 	key := "user1"
-// 	val := []byte(`{"name":"Tom","age":25}`)
-
-// 	err := mc.SetWithVersion(ctx, key, val, 1)
-// 	if err != nil {
-// 		log.Fatalf("SetWithVersion 失败: %v", err)
-// 	}
-
-// 	// 等待 pub/sub 消息传递
-// 	time.Sleep(1 * time.Second)
-
-// 	// 检查 localCache 是否生效
-// 	data, err := mc.GetLocalCache().Get(key)
-// 	if err != nil {
-// 		log.Fatalf("本地缓存未命中: %v", err)
-// 	}
-// 	log.Infof("本地缓存数据: %s", data)
-
-// 	// 写入一个版本号较小的数据，应该不会覆盖
-// 	err = mc.SetWithVersion(ctx, key, []byte(`{"name":"Tom","age":111}`), 0)
-// 	if err != nil {
-// 		log.Fatalf("低版本SetWithVersion执行出错: %v", err)
-// 	}
-// 	// 再等一下订阅
-// 	time.Sleep(1 * time.Second)
-
-// 	// 再取本地缓存，验证版本是否被覆盖
-// 	data, _ = mc.GetLocalCache().Get(key)
-// 	version := mc.GetVersion(data)
-// 	if version != 1 {
-// 		log.Fatalf("本地缓存被低版本覆盖了，当前版本=%d", version)
-// 	}
-// 	fmt.Println(data)
-
-// 	dt, err := mc.GetInPubSub(ctx, key)
-// 	if err != nil {
-// 		log.Fatalf("本地缓存获取不到要的信息")
-// 	} else {
-// 		fmt.Println("本地缓存获取得要的信息", string(dt))
-// 	}
-
-// 	mc.GetLocalCache().Delete(key)
-
-// 	dt, err = mc.GetInPubSub(ctx, key)
-// 	if err != nil {
-// 		log.Fatalf("分布式缓存获取不到要的信息")
-// 	} else {
-// 		fmt.Println("分布式缓存获取得到要的信息", string(dt))
-// 	}
-
-// 	dt, err = mc.GetLocalCache().Get(key)
-// 	if err != nil {
-// 		log.Fatalf("本地缓存无法在get中被同步")
-// 	} else {
-// 		fmt.Println("本地缓存可以在get中被同步", string(dt))
-// 	}
-
-// 	// 测试删除（失败场景：版本过小不应删除）
-// 	err = mc.DelWithVersion(ctx, []string{key}, []int64{99})
-// 	if err != nil {
-// 		log.Fatalf("DelWithVersion 执行出错: %v", err)
-// 	}
-// 	time.Sleep(2 * time.Second)
-
-// 	_, err = mc.GetLocalCache().Get(key)
-// 	if err != nil && err == bigcache.ErrEntryNotFound {
-// 		log.Infof("预期缓存已经不存在,ok")
-// 	} else {
-// 		log.Infof("预期缓存仍存在，版本未满足删除条件: %v", err)
-// 	}
-
-// }
+	if pos {
+		ans *= -1
+	}
+	return int(ans)
+}
 
 func print() {
 	i := 0

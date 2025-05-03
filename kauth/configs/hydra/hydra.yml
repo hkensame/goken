@@ -1,0 +1,42 @@
+dsn: mysql://ken:123@(192.168.199.128:3307)/hydra?parseTime=true
+
+serve:
+  public:
+    host: 0.0.0.0
+    port: 4444
+  admin:
+    host: 0.0.0.0
+    port: 4445
+
+secrets:
+  system:
+    - "thisisaverysecuresecretkey123456"  # 必须 ≥16字符,推荐32字符以上
+
+strategies:
+  access_token: jwt
+  scope: exact
+
+ttl:
+  access_token: 1h
+  refresh_token: 720h
+  id_token: 1h
+
+urls:
+  self:
+    #OAuth2/OpenID Connect里有个概念叫"Issuer",所有token都要标明是谁颁发的,这个issuer字段就是OAuth2协议规范要求的
+    issuer: http://192.168.199.128:4444/  # 本地开发环境允许http(搭配 --dev)
+    #当客户端 (比如 kratos-ui) 申请授权(比如 OAuth2 登录)时,Hydra 会跳转到这里要求用户同意scope
+  consent: http://192.168.199.128:3000/consent
+    #当 OAuth2 流程需要用户登录时,Hydra会跳到这个登录页面
+  login: http://192.168.199.128:3000/login
+  logout: http://192.168.199.128:3000/logout
+
+oauth2:
+  expose_internal_errors: true
+  pkce:
+    enforced: true
+    enforced_for_public_clients: true
+
+log:
+  level: debug
+  format: json

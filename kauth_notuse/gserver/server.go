@@ -107,13 +107,15 @@ type config struct {
 	CodeTTL time.Duration
 }
 
-func MustNewServer(cfg *config, manager *manage.Manager, cli redis.UniversalClient) *Server {
+func MustNewServer(cfg *config, manager *manage.Manager, cli redis.UniversalClient, l *otelzap.Logger) *Server {
 	srv := &Server{
 		Config:  cfg,
 		Manager: manager,
 		Cache: cache.New(&cache.Options{
 			Redis: cli,
 		}),
+		logger: l,
+		Logger: l.Sugar(),
 	}
 	return srv
 }

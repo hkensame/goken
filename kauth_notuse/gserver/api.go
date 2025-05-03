@@ -54,11 +54,13 @@ func (s *Server) Authorize() gin.HandlerFunc {
 			return
 		}
 
+		if _, err := s.GetClientInfo(ctx, res.ClientID); err != nil {
+			httputil.WriteError(ctx, errors.StatusCodes[err], err, true)
+		}
 		if err := s.CheckAllowedAuthorizeRequst(res); err != nil {
 			httputil.WriteError(ctx, errors.StatusCodes[err], err, true)
 			return
 		}
-
 		// 检查时已经通过,不用担心出错
 		u, _ := url.Parse(res.RedirectURI)
 		u = s.addUrlInfo(u, "state", res.State)
@@ -144,7 +146,8 @@ func (s *Server) Token() gin.HandlerFunc {
 			}
 			val := []byte{}
 			key := fmt.Sprintf("kauth:code:%s", res.Code)
-			if err := s.Cache.Get(ctx.Request.Context(), key, val); err != nil {
+
+			if err := s.Cache.Get(ctx.Request.Context(), key, &val); err != nil {
 				httputil.WriteError(ctx, http.StatusBadRequest, errors.ErrInvalidAuthorizeCode, true)
 				return
 			}
@@ -159,6 +162,7 @@ func (s *Server) Token() gin.HandlerFunc {
 
 			gt, err := s.generateToken(res)
 			if err != nil {
+				fmt.Println("wwwwwwwqwqiwgnqoiwngiqonegoiqngiow")
 				httputil.WriteError(ctx, http.StatusInternalServerError, err, true)
 				return
 			}
@@ -182,4 +186,8 @@ func (s *Server) Token() gin.HandlerFunc {
 
 		httputil.WriteError(ctx, http.StatusBadRequest, errors.ErrUnsupportedGrantType, true)
 	}
+}
+
+func (s *Server) Introspect(f gin.HandlerFunc) gin.HandlerFunc {
+	return f
 }

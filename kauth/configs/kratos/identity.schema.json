@@ -1,0 +1,40 @@
+{
+  "$id": "https://schemas.ory.sh/presets/kratos/user_identity.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "User Identity",
+  "type": "object",
+  "properties": {
+    "traits": {
+      "type": "object",
+      "properties": {
+        "mobile": {
+          "type": "string",
+          "pattern": "^[0-9]{10,12}$",
+          "title": "Mobile Phone"
+        },
+        "username": {
+          "type": "string",
+          "maxLength": 20,
+          "title": "User Name"
+        },
+        "password": {
+          "type": "string",
+          "minLength": 6,
+          "title": "Password"
+        },
+        "birth": {
+          "type": "string",
+          "format": "date",
+          "title": "Birth Date"
+        },
+        "gender": {
+          "type": "string",
+          "enum": ["boy", "girl"],
+          "title": "Gender"
+        }
+      },
+      "required": ["mobile", "username", "password"]
+    }
+  },
+  "required": ["traits"]
+}

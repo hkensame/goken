@@ -11,7 +11,7 @@ import (
 func (s *Server) GetClientInfo(ctx *gin.Context, clientID string) (cli oauth2.ClientInfo, err error) {
 	res, err := s.Manager.GetClient(ctx.Request.Context(), clientID)
 	if err != nil {
-		return nil, err
+		return nil, errors.ErrInvalidClient
 	}
 	if _, ok := res.(ClientInfo); !ok {
 		return nil, errors.ErrInvalidClient
@@ -43,7 +43,6 @@ func (s *Server) GetTokenInfo(c *gin.Context) (*TokenInfo, error) {
 	if err := c.ShouldBind(res); err != nil {
 		return nil, errors.ErrInvalidRequest
 	}
-
 	res.Ctx = c
 	return res, nil
 }

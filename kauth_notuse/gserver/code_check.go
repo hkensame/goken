@@ -1,7 +1,7 @@
 package gserver
 
 import (
-	"encoding/base64"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -16,6 +16,7 @@ import (
 
 // 检查/token方法下得到的tokeninfo与存入的data是否一致
 func (s *Server) CheckValidCodeTokenInfo(cd *authCodeData, tk *TokenInfo) error {
+	fmt.Println(cd, tk)
 	err := s.checkValidCodeChallenge(cd, tk.CodeVerifier, tk.needPKCE)
 	if err != nil {
 		return err
@@ -49,7 +50,7 @@ func (s *Server) checkValidCodeChallenge(cd *authCodeData, cv string, needPKCE b
 	switch cd.CodeChallengeMethod {
 	case oauth2.CodeChallengeS256.String():
 		ccub := encrypt.HashWithDefault([]byte(cv), encrypt.SHA256)
-		if base64.RawURLEncoding.EncodeToString(ccub) != cd.CodeChallenge {
+		if string(ccub) != cd.CodeChallenge {
 			return errors.ErrUnauthorizedClient
 		}
 	// 	// 考虑不允许明文

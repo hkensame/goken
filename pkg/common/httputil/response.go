@@ -41,7 +41,7 @@ func WriteResponse(c *gin.Context, code int, msg string, data interface{}, abort
 }
 
 func WriteError(c *gin.Context, code int, err error, abort bool) {
-	newJsonResult(code, err.Error(), nil)
+	newJsonResult(code, err.Error(), nil).WriteResponse(c, abort)
 }
 
 func WriteRpcError(c *gin.Context, err error, abort bool) {

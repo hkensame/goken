@@ -2,7 +2,6 @@ package jwt
 
 import (
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -30,7 +29,7 @@ type GinJWTMiddleware struct {
 	// 用于动态获取签名密钥的回调函数,设置KeyFunc将绕过所有其他密钥设置,可适用于使用公私钥对的场景
 	KeyFunc func(token *jwt.Token) (interface{}, error)
 
-	// JWT token的有效时长,可选默认值为一天,
+	// JWT token的有效时长
 	Timeout time.Duration
 
 	// 返回timeout时间,即源码内不直接使用Timeout字段,可以自定义逻辑处理Timeout
@@ -56,17 +55,11 @@ type GinJWTMiddleware struct {
 	// 是否使用gin.Context的abort(),
 	UseAbort bool
 
-	// 可选地将token作为cookie返回,默认关闭
-	SendCookie bool
+	// 允许使用refresh_token,开启则强制使用security cookie(强制使用https,并且开启http only)
+	EnableRefresh bool
 
-	// cookie的有效时长,默认等于Timeout值,
-	CookieMaxAge time.Duration
-
-	// 允许在使用不安全的cookie,默认开启
-	SecureCookie bool
-
-	// 允许在开发过程中更改cookie名称
-	CookieName string
+	// 允许在验证失败时redirect,但是只允许跳转到get
+	EnableRedirect bool
 
 	// 允许使用 http.SameSite cookie参数(用于控制jwt-cookie的跨域传输),可选参数为:
 	// SameSiteDefaultMode:默认行为,取决于浏览器,
@@ -76,197 +69,76 @@ type GinJWTMiddleware struct {
 
 	// 允许修改jwt的解析器方法
 	ParseOptions []jwt.ParserOption
-
-	// 默认值为"exp",是expire存储在MapClaims中的key
-	ExpField string
 }
 
-// 用于生成jwt.Token
+// 用于生成access_token
 func (mw *GinJWTMiddleware) NewToken(keyvalue ...string) (string, time.Time, error) {
+	now := mw.TimeFunc()
+	claims := buildClaims(keyvalue...)
+	expire := now.Add(mw.TimeoutFunc(claims))
+
+	claims[ExpKey] = expire.Unix()
+	claims[OrigIatKey] = now.Unix()
+	claims[IssKey] = mw.Realm
+	claims[NbfKey] = now.Add(-5 * time.Second).Unix()
+	claims[IatKey] = claims[OrigIatKey]
+	claims[AudKey] = mw.Audience
+	claims[TokenTypeKey] = AccessTokenKey
+
 	token := jwt.New(jwt.GetSigningMethod(mw.SigningAlgorithm))
-	claims := token.Claims.(jwt.MapClaims)
-	expire := mw.TimeFunc().Add(mw.TimeoutFunc(claims))
+	token.Claims = claims
 
-	claims[mw.ExpField] = expire.Unix()
-	//orig-iat代表着jwt令牌的原始签发时间,这个时间不会因为refresh等更新
-	claims["orig_iat"] = mw.TimeFunc().Unix()
-	claims["iss"] = mw.Realm
-	// 允许最多5秒时间偏差
-	claims["nbf"] = mw.TimeFunc().Add(-time.Second * 5).Unix()
-	claims["iat"] = claims["orig_iat"]
-	claims["aud"] = mw.Audience
-	refreshExpire := expire.Add(mw.MaxRefreshFunc(claims))
-	claims["rfs_exp"] = refreshExpire.Unix()
-
-	//把自定义的kv perload加入其中
-	for i := 0; i+1 < len(keyvalue); i += 2 {
-		claims[keyvalue[i]] = keyvalue[i+1]
-	}
-
-	tokenString, err := token.SignedString(mw.Key)
+	accessToken, err := token.SignedString(mw.Key)
 	if err != nil {
-		return "", time.Time{}, err
+		return "", time.Time{}, ErrFailedTokenCreation
 	}
-	return tokenString, expire, nil
+	return accessToken, expire, nil
 }
 
-// 从gin.Context中获取jwt.Token
-func (mw *GinJWTMiddleware) getTokenFromCtx(c *gin.Context) (*jwt.Token, error) {
-	var token string
-	var err error
-
-	//如果存在refresh-token就直接使用refresh-token
-	if v, exist := c.Get(RefreshToken); exist {
-		key := v.(string)
-		token = string(key)
-	} else {
-		inside := strings.Split(mw.TokenInside, ",")
-		for _, v := range inside {
-			if token != "" {
-				break
-			}
-			switch v {
-			case "header":
-				token, err = mw.jwtFromHeader(c, mw.TokenHeadName)
-			case "query":
-				token, err = mw.jwtFromQuery(c, mw.TokenHeadName)
-			case "cookie":
-				token, err = mw.jwtFromCookie(c, mw.TokenHeadName)
-			case "param":
-				token, err = mw.jwtFromParam(c, mw.TokenHeadName)
-			case "form":
-				token, err = mw.jwtFromForm(c, mw.TokenHeadName)
-			}
-		}
+// 生成refresh_token并写入HttpOnly Cookie
+func (mw *GinJWTMiddleware) NewRefreshToken(keyvalue ...string) (string, error) {
+	if !mw.EnableRefresh {
+		return "", nil
 	}
+
+	now := mw.TimeFunc()
+	claims := buildClaims(keyvalue...)
+
+	claims[IssKey] = mw.Realm
+	claims[AudKey] = mw.Audience
+	claims[OrigIatKey] = now.Unix()
+	claims[IatKey] = now.Unix()
+	claims[NbfKey] = now.Add(-5 * time.Second).Unix()
+	claims[ExpKey] = now.Add(mw.MaxRefreshFunc(claims)).Unix()
+	claims[TokenTypeKey] = RefreshTokenKey
+
+	token := jwt.New(jwt.GetSigningMethod(mw.SigningAlgorithm))
+	token.Claims = claims
+
+	refreshToken, err := token.SignedString(mw.Key)
 	if err != nil {
-		return nil, err
+		return "", ErrFailedTokenCreation
 	}
-	t, err := mw.parseTokenString(token)
-	if err != nil {
-		return nil, ErrTokenStringInvalid
-	}
-	return t, nil
+
+	return refreshToken, nil
 }
 
-// 将TokenStr反序列为jwt.Token
-func (mw *GinJWTMiddleware) parseTokenString(token string) (*jwt.Token, error) {
-	if mw.KeyFunc != nil {
-		return jwt.Parse(token, mw.KeyFunc, mw.ParseOptions...)
-	}
-
-	return jwt.Parse(token,
-		func(t *jwt.Token) (interface{}, error) {
-			if jwt.GetSigningMethod(mw.SigningAlgorithm) != t.Method {
-				return nil, ErrInvalidSigningAlgorithm
-			}
-
-			return mw.Key, nil
-		},
-		mw.ParseOptions...,
-	)
-}
-
-// 从gin.Context中得到MapClaims,如果ctx中存在refresh-token(jwt被refresh了)则优先从此中找到token和claims
-// 否则从GinJwtMiddleware指定的位置寻找
-func (mw *GinJWTMiddleware) GetClaimsFromContext(c *gin.Context) (jwt.MapClaims, error) {
-	token, err := mw.getTokenFromCtx(c)
-	if err != nil {
-		return nil, err
-	}
-
-	claims := jwt.MapClaims{}
-	for key, value := range token.Claims.(jwt.MapClaims) {
-		claims[key] = value
-	}
-	return claims, nil
-}
-
-// 从gin.Context中反解出对应的MapClaims
-func ExtractClaimsFromContext(c *gin.Context) jwt.MapClaims {
-	claims, exists := c.Get(JwtClaims)
-	if !exists {
-		return make(jwt.MapClaims)
-	}
-
-	return claims.(jwt.MapClaims)
-}
-
-// 从gin.Token中反解出对应的MapClaims
-func ExtractClaimsFromToken(token *jwt.Token) jwt.MapClaims {
-	if token == nil {
-		return make(jwt.MapClaims)
-	}
-
-	claims := jwt.MapClaims{}
-	for key, value := range token.Claims.(jwt.MapClaims) {
-		claims[key] = value
-	}
-
-	return claims
-}
-
-// 将Token加入到Cookie,仅当 SendCookie 开启时有效
-func (mw *GinJWTMiddleware) SetCookie(c *gin.Context, token string) {
-	if !mw.SendCookie {
-		return
-	}
-
-	expireCookie := mw.TimeFunc().Add(mw.CookieMaxAge)
-	maxage := int(expireCookie.Unix() - mw.TimeFunc().Unix())
-
-	// 设置 Cookie
-	c.SetCookie(
-		mw.CookieName,
-		token,
-		maxage,
-		"/",
-		"",
-		mw.SecureCookie,
-		mw.SecureCookie,
-	)
+// 将Token加入到HttpOnly Cookie中
+// TODO:开启http only
+func (mw *GinJWTMiddleware) SetCookie(c *gin.Context, name, token string) {
+	maxAge := int(mw.MaxRefreshFunc(nil).Seconds())
+	c.SetCookie(name, token, maxAge, "/", "", false, true)
 
 	if mw.CookieSameSite != 0 {
 		c.SetSameSite(mw.CookieSameSite)
 	}
 }
 
-func (mw *GinJWTMiddleware) jwtFromHeader(c *gin.Context, key string) (string, error) {
-	token := c.Request.Header.Get(key)
-	if token == "" {
-		return "", ErrEmptyHeadToken
+// 辅助函数:构造基本Claims
+func buildClaims(keyvalue ...string) jwt.MapClaims {
+	claims := jwt.MapClaims{}
+	for i := 0; i+1 < len(keyvalue); i += 2 {
+		claims[keyvalue[i]] = keyvalue[i+1]
 	}
-	return token, nil
-}
-
-func (mw *GinJWTMiddleware) jwtFromCookie(c *gin.Context, key string) (string, error) {
-	cookie, _ := c.Cookie(key)
-	if cookie == "" {
-		return "", ErrEmptyCookieToken
-	}
-	return cookie, nil
-}
-
-func (mw *GinJWTMiddleware) jwtFromParam(c *gin.Context, key string) (string, error) {
-	token := c.Param(key)
-	if token == "" {
-		return "", ErrEmptyParamToken
-	}
-	return token, nil
-}
-
-func (mw *GinJWTMiddleware) jwtFromForm(c *gin.Context, key string) (string, error) {
-	token := c.PostForm(key)
-	if token == "" {
-		return "", ErrEmptyQueryToken
-	}
-	return token, nil
-}
-
-func (mw *GinJWTMiddleware) jwtFromQuery(c *gin.Context, key string) (string, error) {
-	token := c.Query(key)
-	if token == "" {
-		return "", ErrEmptyQueryToken
-	}
-	return token, nil
+	return claims
 }
