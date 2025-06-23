@@ -1,1 +1,0 @@
-code_gen code_in.go -code_out=../../

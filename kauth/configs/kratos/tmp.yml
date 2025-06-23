@@ -1,0 +1,125 @@
+identity:
+  default_schema_id: "default"
+  schemas:
+    - id: "default"
+      url: "file:///etc/kratos/identity.schema.json"
+dsn: postgres://ken:123@192.168.199.131:5432/ken?sslmode=disable&max_conns=20  # 数据源连接字符串，例如 PostgreSQL 数据库，通常通过环境变量设置
+
+serve:
+  public:
+    base_url: http://127.0.0.1:4433/  # 对外暴露的 HTTP 服务端口
+    cors:
+      enabled: true  # 启用跨域请求支持
+      allowed_origins:
+        - http://127.0.0.1:3000  # 允许来自这个 origin 的请求
+      allowed_methods:
+        - POST
+        - GET
+        - PUT
+        - PATCH
+        - DELETE
+      allowed_headers:
+        - Authorization
+        - Content-Type
+        - Cookie
+      exposed_headers:
+        - Content-Type
+        - Set-Cookie  # 前端可以访问的响应头
+  admin:
+    base_url: http://127.0.0.1:4434/  # 管理接口地址，供内部使用
+
+selfservice:
+  methods:
+    password:
+      enabled: true  # 启用用户名+密码注册/登录
+    oidc:
+      enabled: false  # 禁用 OIDC 登录（如 Google/Facebook 登录）
+    profile:
+      enabled: true  # 启用用户信息更新功能
+    link:
+      enabled: true  # 启用基于链接的恢复和验证（如邮件找回/验证）
+
+  default_browser_return_url: http://127.0.0.1:3000/  # 默认跳转 URL（无 return_to 参数时）
+  allowed_return_urls:
+    - http://127.0.0.1:3000  # 安全的跳转地址白名单，防止开放重定向攻击
+
+  flows:
+    registration:
+      lifespan: 10m  # 注册流程生命周期
+      ui_url: http://127.0.0.1:3000/auth/registration  # 前端注册页面地址
+      after:
+        default_browser_return_url: http://127.0.0.1:3000  # 注册成功默认跳转地址
+        password:
+          hooks:
+            - hook: session  # 注册成功后自动创建会话
+
+    login:
+      lifespan: 10m
+      ui_url: http://127.0.0.1:3000/auth/login  # 登录页面地址
+
+    logout:
+      after:
+        default_browser_return_url: http://127.0.0.1:3000/auth/login  # 退出登录后跳转地址
+
+    verification:
+      enabled: true
+      lifespan: 15m  # 验证链接有效时间
+      ui_url: http://127.0.0.1:3000/verify
+      after:
+        default_browser_return_url: http://127.0.0.1:3000
+
+    recovery:
+      enabled: true
+      lifespan: 15m
+      ui_url: http://127.0.0.1:3000/recovery
+
+    settings:
+      lifespan: 15m 
+      privileged_session_max_age: 1m  # 密码更新前会话最大允许时间，超过则要求重新登录
+      ui_url: http://127.0.0.1:3000/settings
+
+    error:
+      ui_url: http://127.0.0.1:3000/error  # 错误页面
+
+log:
+  level: info  # 日志级别（debug/info/warn/error）
+  format: json  # 日志格式
+  leak_sensitive_values: false  # 是否泄露敏感值到日志
+
+hashers:
+  algorithm: argon2  # 密码加密算法
+  argon2:
+    iterations: 2
+    parallelism: 1
+    salt_length: 16
+    key_length: 16
+    expected_duration: 500ms
+    expected_deviation: 500ms
+    dedicated_memory: 1GB
+    memory: 128MB  # 密码哈希强度配置，越高越安全也越耗性能
+
+session:
+  lifespan: 1h  # 会话有效期
+  cookie:
+    name: "ory_kratos_session"  # 会话 Cookie 名称
+    persistent: true  # 是否持久化 Cookie
+    path: "/"
+    same_site: Strict  # SameSite 策略（Strict/Lax/None）
+#    domain: ""  # 可选的 cookie domain，默认为当前主机
+
+dev: true  # 是否启用开发者模式
+help: false  # 显示帮助信息
+
+sqa-opt-out: true  # 禁用匿名使用数据上报
+expose-metrics-port: 0  # 关闭 Prometheus 指标暴露端口
+
+# config:
+#   - ""  # 保留字段，无需配置
+
+watch-courier: true  # 启用后台邮件发送服务
+
+courier:
+  smtp:
+    connection_uri: smtps://test:test@mailslurper:1025/?skip_ssl_verify=true&legacy_ssl=true  # 邮件服务配置
+    from_name: kratos
+    from_address: no-reply@ory.kratos.sh

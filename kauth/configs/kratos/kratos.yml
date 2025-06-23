@@ -1,11 +1,29 @@
-dsn: mysql://ken:123@(192.168.199.128:3307)/kratos?parseTime=true&multiStatements=true
-
+#dsn: mysql://ken:123@(192.168.199.131:3307)/kratos?parseTime=true&multiStatements=true
+dsn: postgres://ken:123@(192.168.199.131:5432)/ken?sslmode=disable&max_conns=20
 serve:
   public:
     host: 0.0.0.0
     port: 4433
-    #告诉 Kratos自己:你现在跑在 http://192.168.199.128:4433,以后生成所有回调URL的时候就基于这个来搞
-    base_url: http://192.168.199.128:4433
+    #告诉 Kratos自己:你现在跑在 http://192.168.199.131:4433,以后生成所有回调URL的时候就基于这个来搞
+    base_url: http://192.168.199.131:4433
+    cors:
+      enabled: true
+      # debug: true
+      allowed_origins:
+        - http://127.0.0.1:3000
+      allowed_methods:
+        - POST
+        - GET
+        - PUT
+        - PATCH
+        - DELETE
+      allowed_headers:
+        - Authorization
+        - Content-Type
+        - Cookie
+      exposed_headers:
+        - Content-Type
+        - Set-Cookie
   admin:
     host: 0.0.0.0
     port: 4434
@@ -18,7 +36,7 @@ identity:
 
 selfservice:
   #当用户注册/登录/验证 完成之后,如果 flow 里没指定 redirect_to,就跳转到这个地址
-  default_browser_return_url: http://192.168.199.128:3000/dashboard
+  default_browser_return_url: http://192.168.199.131:3000/dashboard
   methods:
     password:
       enabled: true
@@ -27,15 +45,15 @@ selfservice:
   #当浏览器访问Kratos的flow接口,比如/self-service/registration/browser,Kratos处理完后,告诉浏览器跳转到前端UI的对应页面
   flows:
     registration:
-      ui_url: http://192.168.199.128:3000/registration
+      ui_url: http://192.168.199.131:3000/registration
     login:
-      ui_url: http://192.168.199.128:3000/login
+      ui_url: http://192.168.199.131:3000/login
     settings:
-      ui_url: http://192.168.199.128:3000/settings
+      ui_url: http://192.168.199.131:3000/settings
     recovery:
-      ui_url: http://192.168.199.128:3000/recovery
+      ui_url: http://192.168.199.131:3000/recovery
     verification:
-      ui_url: http://192.168.199.128:3000/verification
+      ui_url: http://192.168.199.131:3000/verification
 
 secrets:
   cookie:

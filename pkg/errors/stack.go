@@ -2,100 +2,99 @@ package errors
 
 import (
 	"fmt"
-	"path"
+	"path/filepath"
 	"runtime"
 	"strings"
 )
 
-// Frame 代表一个调用栈帧
 type Frame struct {
-	pc       uintptr
-	function string
-	file     string
-	line     int
+	Function string
+	File     string
+	Line     int
 }
 
-// 创建 Frame 时直接解析文件名,行号,函数名,避免多次 runtime.FuncForPC
 func newFrame(pc uintptr) Frame {
-	pc--
+	pc = pc - 1 // 调整 PC 保证能正确获取调用点
 	fn := runtime.FuncForPC(pc)
 	if fn == nil {
-		return Frame{pc: pc, function: "unknown", file: "unknown", line: 0}
+		return Frame{"unknown", "unknown", 0}
 	}
 	file, line := fn.FileLine(pc)
-	return Frame{pc: pc, function: fn.Name(), file: file, line: line}
+	return Frame{
+		Function: fn.Name(),
+		File:     file,
+		Line:     line,
+	}
 }
 
-// 格式化输出 Frame
+// 打印格式化 Frame
 func (f Frame) Format(s fmt.State, verb rune) {
 	switch verb {
 	case 's':
 		if s.Flag('+') {
-			fmt.Fprintf(s, "%s\n\t%s", f.function, f.file)
+			fmt.Fprintf(s, "%s\n\t%s:%d", f.Function, f.File, f.Line)
 		} else {
-			fmt.Fprint(s, path.Base(f.file))
+			fmt.Fprint(s, filepath.Base(f.File))
 		}
-	case 'd':
-		fmt.Fprint(s, f.line)
-	case 'n':
-		fmt.Fprint(s, funcname(f.function))
 	case 'v':
 		f.Format(s, 's')
-		fmt.Fprint(s, ":")
-		f.Format(s, 'd')
 	}
 }
 
-// 实现 `MarshalText`
+// 可用于日志输出、序列化
 func (f Frame) MarshalText() ([]byte, error) {
-	if f.function == "unknown" {
-		return []byte(f.function), nil
-	}
-	return []byte(fmt.Sprintf("%s %s:%d", f.function, f.file, f.line)), nil
+	return []byte(fmt.Sprintf("%s %s:%d", f.Function, f.File, f.Line)), nil
 }
 
-// stack 代表调用栈
 type stack []Frame
 
-// 格式化 stack
+// 栈格式化支持 %+v
 func (s *stack) Format(st fmt.State, verb rune) {
 	if verb == 'v' && st.Flag('+') {
-		for _, f := range *s {
-			fmt.Fprintf(st, "%+v\n", f)
+		for _, frame := range *s {
+			fmt.Fprintf(st, "%+v\n", frame)
 		}
 	}
+}
+
+// 栈文本序列化
+func (s *stack) MarshalText() ([]byte, error) {
+	var b strings.Builder
+	for _, f := range *s {
+		b.WriteString(fmt.Sprintf("%s %s:%d\n", f.Function, f.File, f.Line))
+	}
+	return []byte(b.String()), nil
 }
 
 // 获取调用栈
 func callers() *stack {
-	const depth = 32
-	var pcs [depth]uintptr
-	n := runtime.Callers(3, pcs[:]) // 2 以获取调用 callers() 之上的栈帧
+	const maxDepth = 32
+	var pcs [maxDepth]uintptr
 
+	n := runtime.Callers(3, pcs[:]) // skip: runtime.Callers + callers + 创建栈的函数
 	st := make(stack, 0, n)
+
 	for _, pc := range pcs[:n] {
 		fn := runtime.FuncForPC(pc)
 		if fn == nil {
 			continue
 		}
 		name := fn.Name()
-
-		// 过滤掉 runtime 和 asm 相关的帧
-		if !strings.Contains(name, "runtime.") && !strings.Contains(name, "asm_") {
-			st = append(st, newFrame(pc))
+		if isInternalRuntime(name) {
+			continue
 		}
+		st = append(st, newFrame(pc))
 	}
 
 	return &st
 }
 
-// 解析函数名,去除路径前缀
-func funcname(name string) string {
-	if i := strings.LastIndex(name, "/"); i != -1 {
-		name = name[i+1:]
-	}
-	if i := strings.Index(name, "."); i != -1 {
-		name = name[i+1:]
-	}
-	return name
+// 是否是 runtime 或内部调用，过滤掉
+func isInternalRuntime(name string) bool {
+	return strings.HasPrefix(name, "runtime.") ||
+		strings.HasPrefix(name, "testing.") ||
+		strings.HasPrefix(name, "internal/") ||
+		strings.Contains(name, "goexit") ||
+		strings.HasPrefix(name, "reflect.") ||
+		strings.HasPrefix(name, "asm_")
 }

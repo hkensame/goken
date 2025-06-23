@@ -1,0 +1,5 @@
+mobile	string	必须为10-12位数字正则验证:^[0-9]{10,12}$	必填
+username	string	最大长度20字符	必填
+password	string	最小长度6字符	必填
+birth	string	必须符合日期格式（如"2023-01-01"）通过format: "date"验证	可选
+gender	string	枚举值限制:只能为"boy"或"girl"	可选
