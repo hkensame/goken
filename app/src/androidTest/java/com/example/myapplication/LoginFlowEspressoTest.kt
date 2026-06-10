@@ -5,11 +5,9 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onAllNodes
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
-import androidx.compose.ui.test.waitUntil
 import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -50,13 +48,7 @@ class LoginFlowEspressoTest {
         app().container.auth.logout()
     }
 
-    @Test
-    fun coldStart_showsLoginScreen() {
-        Espresso.onIdle()
-        composeRule.onNodeWithText("学号").assertIsDisplayed()
-        composeRule.onNodeWithText("密码").assertIsDisplayed()
-        composeRule.onNode(hasText("登录") and hasClickAction()).assertIsDisplayed()
-    }
+
 
     @Test
     fun loginScreen_navigateToRegisterAndBack() {

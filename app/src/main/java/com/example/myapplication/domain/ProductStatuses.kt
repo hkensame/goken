@@ -26,3 +26,19 @@ object OrderStatus {
         else -> "未知"
     }
 }
+
+/** 通知类型（SQLite 中存字符串） */
+object NotificationType {
+    const val ORDER_CONFIRMED = "ORDER_CONFIRMED"   // 卖家确认订单
+    const val ORDER_COMPLETED = "ORDER_COMPLETED"   // 交易完成
+    const val ORDER_CANCELLED = "ORDER_CANCELLED"   // 订单取消
+    const val NEW_MESSAGE = "NEW_MESSAGE"           // 新消息
+
+    fun label(type: String): String = when (type) {
+        ORDER_CONFIRMED -> "订单已确认"
+        ORDER_COMPLETED -> "交易完成"
+        ORDER_CANCELLED -> "订单已取消"
+        NEW_MESSAGE -> "新消息"
+        else -> type
+    }
+}

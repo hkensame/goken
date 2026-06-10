@@ -15,7 +15,10 @@ data class UserEntity(
     @ColumnInfo(name = "student_id") val studentId: String,
     val password: String,
     val nickname: String,
+    @ColumnInfo(name = "avatar_path") val avatarPath: String? = null,
+    val phone: String? = null,
     val createdAt: Long,
+    @ColumnInfo(name = "updated_at") val updatedAt: Long = 0,
 )
 
 @Entity(
@@ -40,6 +43,7 @@ data class ProductEntity(
     @ColumnInfo(name = "image_path") val imageLocalPath: String?,
     val status: String,
     @ColumnInfo(name = "created_at") val createdAt: Long,
+    @ColumnInfo(name = "updated_at") val updatedAt: Long = 0,
 )
 
 @Entity(
@@ -121,13 +125,14 @@ data class ConversationEntity(
             onDelete = ForeignKey.CASCADE,
         ),
     ],
-    indices = [Index("conversation_id"), Index("created_at")],
+    indices = [Index("conversation_id"), Index("sender_id"), Index("created_at")],
 )
 data class MessageEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     @ColumnInfo(name = "conversation_id") val conversationId: Long,
     @ColumnInfo(name = "sender_id") val senderId: Long,
     val content: String,
+    @ColumnInfo(name = "is_read") val isRead: Int = 0,
     @ColumnInfo(name = "created_at") val createdAt: Long,
 )
 
@@ -165,4 +170,49 @@ data class ConversationSummary(
     val peerNickname: String,
     val lastMessageAt: Long,
     val lastMessagePreview: String?,
+    val unreadCount: Int = 0,
+)
+
+/** 商品多图：一张 product 可对应多张图片 */
+@Entity(
+    tableName = "product_images",
+    foreignKeys = [
+        ForeignKey(
+            entity = ProductEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["product_id"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index("product_id")],
+)
+data class ProductImageEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    @ColumnInfo(name = "product_id") val productId: Long,
+    @ColumnInfo(name = "image_path") val imagePath: String,
+    @ColumnInfo(name = "sort_order") val sortOrder: Int = 0,
+)
+
+/** 站内通知：订单状态变更、新消息等 */
+@Entity(
+    tableName = "notifications",
+    foreignKeys = [
+        ForeignKey(
+            entity = UserEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["user_id"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index("user_id"), Index("is_read"), Index("created_at")],
+)
+data class NotificationEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    @ColumnInfo(name = "user_id") val userId: Long,
+    val type: String,
+    val title: String,
+    val content: String,
+    @ColumnInfo(name = "related_id") val relatedId: Long = 0,
+    @ColumnInfo(name = "is_read") val isRead: Int = 0,
+    @ColumnInfo(name = "created_at") val createdAt: Long,
 )

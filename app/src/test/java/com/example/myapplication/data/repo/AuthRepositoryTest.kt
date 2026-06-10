@@ -74,7 +74,7 @@ class AuthRepositoryTest {
 
     @Test
     fun login_trimsStudentId_beforeLookup(): Unit = runTest {
-        val user = UserEntity(1L, "U1", "pw", "n", 0L)
+        val user = UserEntity(id = 1L, studentId = "U1", password = "pw", nickname = "n", createdAt = 0L)
         coEvery { userDao.login("U1", "pw") } returns user
         val r = repo.login("  U1  ", "pw")
         assertTrue(r.isSuccess)

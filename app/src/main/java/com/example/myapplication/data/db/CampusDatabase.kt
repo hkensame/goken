@@ -13,8 +13,10 @@ import androidx.room.RoomDatabase
         OrderEntity::class,
         ConversationEntity::class,
         MessageEntity::class,
+        ProductImageEntity::class,
+        NotificationEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 abstract class CampusDatabase : RoomDatabase() {
@@ -24,6 +26,8 @@ abstract class CampusDatabase : RoomDatabase() {
     abstract fun orderDao(): OrderDao
     abstract fun conversationDao(): ConversationDao
     abstract fun messageDao(): MessageDao
+    abstract fun productImageDao(): ProductImageDao
+    abstract fun notificationDao(): NotificationDao
 
     companion object {
         fun build(context: Context): CampusDatabase =
