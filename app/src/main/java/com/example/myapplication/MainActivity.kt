@@ -12,6 +12,9 @@ import com.example.myapplication.ui.theme.MyApplicationTheme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        android.util.Log.d("TEST", "test debug")
+
         enableEdgeToEdge()
         val app = application as CampusApplication
         setContent {

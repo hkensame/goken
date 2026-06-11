@@ -254,6 +254,9 @@ interface MessageDao {
     @Insert
     suspend fun insert(m: MessageEntity): Long
 
+    @Query("SELECT * FROM messages WHERE id = :id")
+    suspend fun getById(id: Long): MessageEntity?
+
     @Query("SELECT * FROM messages WHERE conversation_id = :cid ORDER BY created_at ASC")
     fun observeMessages(cid: Long): Flow<List<MessageEntity>>
 
@@ -283,6 +286,9 @@ interface ProductImageDao {
     @Insert
     suspend fun insertAll(images: List<ProductImageEntity>): List<Long>
 
+    @Query("SELECT * FROM product_images WHERE id = :id")
+    suspend fun getById(id: Long): ProductImageEntity?
+
     @Query("SELECT * FROM product_images WHERE product_id = :productId ORDER BY sort_order ASC")
     fun observeByProduct(productId: Long): Flow<List<ProductImageEntity>>
 
@@ -300,6 +306,9 @@ interface ProductImageDao {
 interface NotificationDao {
     @Insert
     suspend fun insert(notification: NotificationEntity): Long
+
+    @Query("SELECT * FROM notifications WHERE id = :id")
+    suspend fun getById(id: Long): NotificationEntity?
 
     @Query("SELECT * FROM notifications WHERE user_id = :userId ORDER BY created_at DESC")
     fun observeByUser(userId: Long): Flow<List<NotificationEntity>>

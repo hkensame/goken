@@ -20,8 +20,11 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -41,7 +44,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
@@ -135,10 +140,16 @@ private val TopLevel = setOf("home", "publish", "favorites", "messages", "profil
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainShell(userId: Long) {
+    val c = LocalAppContainer.current
     val nav = rememberNavController()
     val backStack by nav.currentBackStackEntryAsState()
     val route = backStack?.destination?.route ?: ""
     val showBar = route in TopLevel
+
+    // 消息未读数
+    val unreadCount by c.chat.observeUnreadCount(userId)
+        .collectAsStateWithLifecycle(initialValue = 0)
+
     Scaffold(
         bottomBar = {
             if (!showBar) return@Scaffold
@@ -184,7 +195,17 @@ fun MainShell(userId: Long) {
                             restoreState = true
                         }
                     },
-                    icon = { Icon(Icons.AutoMirrored.Filled.Message, null) },
+                    icon = {
+                        BadgedBox(
+                            badge = {
+                                if (unreadCount > 0) {
+                                    Badge { Text(if (unreadCount > 99) "99+" else unreadCount.toString()) }
+                                }
+                            },
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.Message, null)
+                        }
+                    },
                     label = { Text("消息") },
                 )
                 NavigationBarItem(
@@ -208,6 +229,9 @@ fun MainShell(userId: Long) {
             composable("messages") { ChatListScreen(nav, userId) }
             composable("profile") { ProfileScreen(nav, userId) }
             composable("orders") { OrdersScreen(nav, userId) }
+            composable("myPublished") { MyPublishedScreen(nav, userId) }
+            composable("notifications") { NotificationScreen(nav, userId) }
+            composable("editProfile") { EditProfileScreen(nav, userId) }
             composable(
                 "product/{productId}",
                 listOf(navArgument("productId") { type = NavType.LongType }),
@@ -268,12 +292,18 @@ fun HomeScreen(nav: NavHostController, userId: Long) {
                     )
                 }
             }
-            LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            LazyColumn(
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 items(items, key = { it.id }) { p ->
                     Card(
                         Modifier
                             .fillMaxWidth()
                             .clickable { nav.navigate("product/${p.id}") },
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        ),
                     ) {
                         Row(Modifier.padding(12.dp)) {
                             val path = p.imageLocalPath
@@ -283,17 +313,38 @@ fun HomeScreen(nav: NavHostController, userId: Long) {
                                     null,
                                     Modifier
                                         .width(88.dp)
-                                        .height(88.dp),
+                                        .height(88.dp)
+                                        .clip(MaterialTheme.shapes.small),
                                     contentScale = ContentScale.Crop,
                                 )
                             } else {
-                                Spacer(Modifier.width(88.dp).height(88.dp))
+                                Spacer(
+                                    Modifier
+                                        .width(88.dp)
+                                        .height(88.dp)
+                                        .clip(MaterialTheme.shapes.small),
+                                )
                             }
                             Spacer(Modifier.width(12.dp))
-                            Column {
-                                Text(p.title, style = MaterialTheme.typography.titleMedium)
-                                Text("¥${"%.2f".format(p.priceCents / 100.0)} · ${p.category}")
-                                Text("卖家：${p.sellerNickname}", style = MaterialTheme.typography.bodySmall)
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    p.title,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    "¥${"%.2f".format(p.priceCents / 100.0)} · ${p.category}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    "卖家：${p.sellerNickname}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
                             }
                         }
                     }

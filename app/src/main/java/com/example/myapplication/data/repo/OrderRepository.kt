@@ -3,14 +3,20 @@ package com.example.myapplication.data.repo
 import com.example.myapplication.data.db.OrderDao
 import com.example.myapplication.data.db.OrderEntity
 import com.example.myapplication.data.db.ProductDao
+import com.example.myapplication.data.remote.RemoteApi
 import com.example.myapplication.domain.OrderStatus
 import com.example.myapplication.domain.ProductStatus
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.withContext
 
 class OrderRepository(
     private val orderDao: OrderDao,
     private val productDao: ProductDao,
+    private val api: RemoteApi? = null,
 ) {
+    constructor(orderDao: OrderDao, productDao: ProductDao) : this(orderDao, productDao, null)
+
     fun observeMine(userId: Long): Flow<List<com.example.myapplication.data.db.OrderWithDetails>> =
         orderDao.observeMine(userId)
 
@@ -28,6 +34,17 @@ class OrderRepository(
             return Result.failure(IllegalStateException("该商品已有进行中的订单"))
         }
         val now = System.currentTimeMillis()
+
+        if (api != null) {
+            try {
+                val id = withContext(Dispatchers.IO) {
+                    api.createOrder(productId, buyerId, product.sellerId, OrderStatus.PENDING, now, now)
+                }
+                api.syncOrders(buyerId)
+                return Result.success(id)
+            } catch (_: Exception) { /* 远程失败，回退 Room */ }
+        }
+
         val id = orderDao.insert(
             OrderEntity(
                 productId = productId,
@@ -73,8 +90,24 @@ class OrderRepository(
         if (!ok) return Result.failure(IllegalStateException("非法状态流转"))
 
         val now = System.currentTimeMillis()
-        orderDao.update(order.copy(status = newStatus, updatedAt = now))
 
+        if (api != null) {
+            try {
+                withContext(Dispatchers.IO) {
+                    api.updateOrderStatus(orderId, newStatus, now)
+                    if (newStatus == OrderStatus.COMPLETED) {
+                        api.updateProductStatus(order.productId, ProductStatus.SOLD, now)
+                    }
+                    api.syncOrders(actorUserId)
+                    if (newStatus == OrderStatus.COMPLETED) {
+                        api.syncProducts()
+                    }
+                }
+                return Result.success(Unit)
+            } catch (_: Exception) { /* 远程失败，回退 Room */ }
+        }
+
+        orderDao.update(order.copy(status = newStatus, updatedAt = now))
         if (newStatus == OrderStatus.COMPLETED) {
             val p = productDao.getById(order.productId)
             if (p != null) productDao.update(p.copy(status = ProductStatus.SOLD))

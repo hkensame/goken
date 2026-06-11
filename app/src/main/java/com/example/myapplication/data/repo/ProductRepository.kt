@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import com.example.myapplication.data.db.ProductDao
 import com.example.myapplication.data.db.ProductEntity
+import com.example.myapplication.data.remote.RemoteApi
 import com.example.myapplication.domain.ProductStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -14,6 +15,7 @@ import java.util.UUID
 class ProductRepository(
     private val productDao: ProductDao,
     private val appContext: Context,
+    private val api: RemoteApi? = null,
 ) {
     fun observeMarket(
         search: String,
@@ -28,6 +30,8 @@ class ProductRepository(
         )
 
     fun observeProduct(id: Long) = productDao.observeById(id)
+
+    fun observeBySeller(sellerId: Long) = productDao.observeBySeller(sellerId)
 
     suspend fun getProduct(id: Long) = productDao.getById(id)
 
@@ -44,12 +48,27 @@ class ProductRepository(
         if (yuan < 0) return@withContext Result.failure(IllegalArgumentException("价格不能为负"))
         val path = imageUri?.let { copyImageToInternal(it) }
         val now = System.currentTimeMillis()
+        val trimmedTitle = title.trim()
+        val trimmedDesc = description.trim()
+        val priceCents = (yuan * 100).toLong()
+
+        if (api != null) {
+            try {
+                val id = api.publish(
+                    sellerId, trimmedTitle, trimmedDesc, priceCents,
+                    category, path, ProductStatus.ON_SALE, now,
+                )
+                api.syncProducts()
+                return@withContext Result.success(id)
+            } catch (_: Exception) { /* 远程失败，回退 Room */ }
+        }
+
         val id = productDao.insert(
             ProductEntity(
                 sellerId = sellerId,
-                title = title.trim(),
-                description = description.trim(),
-                priceCents = (yuan * 100).toLong(),
+                title = trimmedTitle,
+                description = trimmedDesc,
+                priceCents = priceCents,
                 category = category,
                 imageLocalPath = path,
                 status = ProductStatus.ON_SALE,
@@ -68,4 +87,3 @@ class ProductRepository(
         return out.absolutePath
     }
 }
-
