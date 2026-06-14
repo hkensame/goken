@@ -5,6 +5,7 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
@@ -88,9 +89,9 @@ class FullFlowEspressoTest {
     }
 
     /** 等待某个文本出现 */
-    private fun waitForText(text: String, timeout: Long = 5_000) {
+    private fun waitForText(text: String, timeout: Long = 5_000, substring: Boolean = false) {
         composeRule.waitUntil(timeout) {
-            composeRule.onAllNodes(hasText(text)).fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodes(hasText(text, substring = substring)).fetchSemanticsNodes().isNotEmpty()
         }
     }
 
@@ -351,19 +352,20 @@ class FullFlowEspressoTest {
 
         // 买家下单
         clickBtn("下单购买")
-        waitForText("订单已创建")
-        composeRule.onNodeWithText("订单已创建").assertIsDisplayed()
+        waitForText("订单已创建，待卖家确认")
+        composeRule.onNodeWithText("订单已创建，待卖家确认").assertIsDisplayed()
 
-        // 买家看订单
+        // 买家看订单（先从商品详情返回首页，否则 NavigationBar 不可见）
+        composeRule.onNodeWithContentDescription("back").performClick()
+        Espresso.onIdle()
         clickTab("我的")
         clickBtn("我的订单")
         waitForText("订单测试商品")
-        composeRule.onNodeWithText("待确认").assertIsDisplayed()
+        composeRule.onNodeWithText("待确认", substring = true).assertIsDisplayed()
 
         // 买家退出，卖家登录确认订单
-        // 先返回个人中心
-        clickBtn("我的订单") // 点 TopBar 返回按钮不好定位，直接退出重登
-        clickTab("我的")
+        composeRule.onNodeWithContentDescription("back").performClick() // 从订单页返回个人中心
+        Espresso.onIdle()
         clickBtn("退出登录")
         waitForText("没有账号？去注册")
 
@@ -376,19 +378,19 @@ class FullFlowEspressoTest {
         clickTab("我的")
         clickBtn("我的订单")
         waitForText("订单测试商品")
-        composeRule.onNodeWithText("待确认").assertIsDisplayed()
+        composeRule.onNodeWithText("待确认", substring = true).assertIsDisplayed()
 
         // 卖家确认
         clickBtn("确认订单")
         Espresso.onIdle()
-        waitForText("交易中")
-        composeRule.onNodeWithText("交易中").assertIsDisplayed()
+        waitForText("交易中", substring = true)
+        composeRule.onNodeWithText("交易中", substring = true).assertIsDisplayed()
 
         // 卖家完成交易
         clickBtn("完成交易")
         Espresso.onIdle()
-        waitForText("已完成")
-        composeRule.onNodeWithText("已完成").assertIsDisplayed()
+        waitForText("已完成", substring = true)
+        composeRule.onNodeWithText("已完成", substring = true).assertIsDisplayed()
     }
 
     // ════════════════════════════════════════
